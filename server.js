@@ -28,13 +28,21 @@ const API_BASE   = PROXY_URL || (REGION === "na"
   ? "https://fleet-api.prd.na.vn.cloud.tesla.com/api/1"
   : "https://fleet-api.prd.eu.vn.cloud.tesla.com/api/1");
 const AUTH_URL   = "https://fleet-auth.prd.vn.cloud.tesla.com/oauth2/v3/token";
+const AUTHORIZE_URL = "https://auth.tesla.com/oauth2/v3/authorize";
 
 // Token state — seeded from env vars at startup, overridable at runtime via
 // POST /api/configure so onboarding works without touching .env
 let accessToken  = process.env.TESLA_ACCESS_TOKEN  || null;
 let refreshToken = process.env.TESLA_REFRESH_TOKEN || null;
 let clientId     = process.env.TESLA_CLIENT_ID     || null;
+let clientSecret = process.env.TESLA_CLIENT_SECRET || null;
 let configured   = !!(accessToken || refreshToken); // true once server has credentials
+
+// Public key for Tesla Fleet API verification
+const PUBLIC_KEY = `-----BEGIN PUBLIC KEY-----
+MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEoOCE+WLAc2uiUVObrhCUIQl2Goca
+xUOuYUadBmJPVWRiLB9MvuaX4bH5hkA5SiXLl09hJ/K6sgGs7hzcaAVbyg==
+-----END PUBLIC KEY-----`;
 
 // ── State ─────────────────────────────────────────────────────────────────────
 let cachedVehicles = [];
@@ -67,7 +75,14 @@ async function ensureToken() {
 }
 async function doRefresh() {
   if (!refreshToken) throw new Error("No refresh token. Complete onboarding or set TESLA_REFRESH_TOKEN env var.");
-  const p = new URLSearchParams({ grant_type: "refresh_token", refresh_token: refreshToken, ...(clientId ? { client_id: clientId } : {}) });
+  if (!clientId) throw new Error("No client ID. Set TESLA_CLIENT_ID env var.");
+  const params = {
+    grant_type: "refresh_token",
+    refresh_token: refreshToken,
+    client_id: clientId
+  };
+  if (clientSecret) params.client_secret = clientSecret;
+  const p = new URLSearchParams(params);
   const r = await axios.post(AUTH_URL, p.toString(), { headers: { "Content-Type": "application/x-www-form-urlencoded" } });
   accessToken = r.data.access_token;
   if (r.data.refresh_token) refreshToken = r.data.refresh_token;
@@ -161,6 +176,57 @@ setInterval(pollGeofence, 120_000); // every 2 minutes
 
 // ── Routes ────────────────────────────────────────────────────────────────────
 
+// Serve Tesla public key for Fleet API verification
+app.get("/.well-known/appspecific/com.tesla.3p.public-key.pem", (req, res) => {
+  res.type("application/x-pem-file").send(PUBLIC_KEY);
+});
+
+// OAuth: Start authorization flow
+app.get("/auth/tesla", (req, res) => {
+  if (!clientId) return res.status(500).send("TESLA_CLIENT_ID not configured");
+  const host = req.get("host");
+  const protocol = req.secure || req.get("x-forwarded-proto") === "https" ? "https" : "http";
+  const redirectUri = `${protocol}://${host}/callback`;
+  const state = Math.random().toString(36).slice(2);
+  const scope = "openid offline_access user_data vehicle_device_data vehicle_cmds vehicle_charging_cmds";
+  const url = `${AUTHORIZE_URL}?client_id=${clientId}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&scope=${encodeURIComponent(scope)}&state=${state}`;
+  res.redirect(url);
+});
+
+// OAuth: Handle callback from Tesla
+app.get("/callback", async (req, res) => {
+  const { code, error, error_description } = req.query;
+  if (error) return res.status(400).send(`OAuth error: ${error_description || error}`);
+  if (!code) return res.status(400).send("Missing authorization code");
+  if (!clientId) return res.status(500).send("TESLA_CLIENT_ID not configured");
+
+  const host = req.get("host");
+  const protocol = req.secure || req.get("x-forwarded-proto") === "https" ? "https" : "http";
+  const redirectUri = `${protocol}://${host}/callback`;
+
+  try {
+    const params = {
+      grant_type: "authorization_code",
+      code,
+      client_id: clientId,
+      redirect_uri: redirectUri
+    };
+    if (clientSecret) params.client_secret = clientSecret;
+    const p = new URLSearchParams(params);
+    const r = await axios.post(AUTH_URL, p.toString(), {
+      headers: { "Content-Type": "application/x-www-form-urlencoded" }
+    });
+    accessToken = r.data.access_token;
+    refreshToken = r.data.refresh_token;
+    configured = true;
+    console.log("✓ OAuth callback: tokens received");
+    res.redirect("/?auth=success");
+  } catch (e) {
+    console.error("OAuth callback error:", e.response?.data || e.message);
+    res.status(500).send(`Token exchange failed: ${e.response?.data?.error_description || e.message}`);
+  }
+});
+
 app.get("/api/status", (req, res) => res.json({ ok: true, proxy: !!PROXY_URL, region: REGION, telemetry: { connected: telemetry.connected }, geofence: { active: geofence.active, status: geofence.status } }));
 
 // ── Token configuration ───────────────────────────────────────────────────────
@@ -173,7 +239,28 @@ app.get("/api/configured", (req, res) => res.json({ configured }));
 // The token lives in server RAM — restarts require re-onboard OR env var.
 // For persistent deployments: set TESLA_REFRESH_TOKEN in .env / Glitch env.
 app.post("/api/configure", async (req, res) => {
-  const { refreshToken: rt, clientId: cid } = req.body;
+  const { refreshToken: rt, accessToken: at, clientId: cid } = req.body;
+
+  // If access token provided, use it directly (skip refresh)
+  if (at && typeof at === "string" && at.length > 50) {
+    accessToken = at.trim();
+    if (rt) refreshToken = rt.trim();
+    if (cid) clientId = cid;
+    configured = true;
+    console.log("✓ Token configured via /api/configure (access token)");
+
+    // Validate by making a test call
+    try {
+      await tesla("get", "/vehicles");
+      return res.json({ ok: true, configured: true, tokenPrefix: at.slice(0, 8) + "..." });
+    } catch (e) {
+      accessToken = null;
+      refreshToken = null;
+      configured = false;
+      return res.status(401).json({ error: "Token rejected by Tesla: " + e.message });
+    }
+  }
+
   if (!rt || typeof rt !== "string" || rt.length < 20) {
     return res.status(400).json({ error: "Invalid token format." });
   }
