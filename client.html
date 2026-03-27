@@ -1145,6 +1145,11 @@ async function refresh() {
     const r = await fetchJ(`/api/vehicles/${selId}/data?endpoints=charge_state;climate_state;drive_state;location_data;vehicle_state;vehicle_config`);
     if (r.error) throw new Error(r.error);
     vData = r.response;
+    console.log('🚗 Vehicle data:', {
+      battery: vData?.charge_state?.battery_level,
+      location: vData?.drive_state?.latitude ? `${vData.drive_state.latitude}, ${vData.drive_state.longitude}` : 'NO LOCATION',
+      drive_state_keys: vData?.drive_state ? Object.keys(vData.drive_state) : 'none'
+    });
     // Fetch recent alerts in background
     fetchAlerts();
     applyLayout();
