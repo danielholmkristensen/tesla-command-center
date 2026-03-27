@@ -530,6 +530,9 @@ app.get("/manifest.json", (req, res) => res.json({ name: "Tesla", short_name: "T
 app.get("/sw.js", (req, res) => { res.setHeader("Content-Type", "application/javascript"); res.send(`const C='t5';self.addEventListener('install',e=>{e.waitUntil(caches.open(C).then(c=>c.addAll(['/'])));self.skipWaiting();});self.addEventListener('activate',e=>{e.waitUntil(caches.keys().then(ks=>Promise.all(ks.filter(k=>k!==C).map(k=>caches.delete(k)))));self.clients.claim();});self.addEventListener('fetch',e=>{if(e.request.url.includes('/api/')||e.request.url.includes('/fleet-'))return;e.respondWith(caches.match(e.request).then(r=>r||fetch(e.request).catch(()=>caches.match('/'))));});self.addEventListener('push',e=>{const d=e.data?.json()||{title:'Tesla Alert',body:'Vehicle notification'};e.waitUntil(self.registration.showNotification(d.title,{body:d.body,icon:'/icon.svg',tag:'tesla',requireInteraction:d.urgent}));});`); });
 app.get("/icon.svg", (req, res) => { res.type("image/svg+xml"); res.send(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 192 192"><rect width="192" height="192" rx="40" fill="#E31937"/><text x="96" y="132" font-size="108" font-family="sans-serif" font-weight="bold" fill="white" text-anchor="middle">T</text></svg>`); });
 
+// Alert dictionary for decoding alert codes
+app.get("/alerts.json", (req, res) => res.sendFile(require("path").join(__dirname, "alerts.json")));
+
 app.get("/", (req, res) => res.sendFile(require("path").join(__dirname, "client.html")));
 
 server.listen(PORT, "0.0.0.0", () => {

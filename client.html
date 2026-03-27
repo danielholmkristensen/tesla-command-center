@@ -1005,6 +1005,7 @@ let geofence = { active: false, center: null, radiusKm: 0.5, name: 'Home', statu
 let moneyStep = 0, moneyAnswers = {};
 let activeSheet = null;
 let recentAlerts = []; // From Tesla /recent_alerts endpoint
+let alertDict = null; // Alert dictionary loaded on demand
 let deferredInstall = null;
 let carMap = null, fenceMap = null;
 let refreshTimer = null;
@@ -1164,7 +1165,29 @@ async function fetchAlerts() {
     } else if (Array.isArray(r.response)) {
       recentAlerts = r.response.slice(0, 10);
     }
+    // Decode alerts using dictionary if loaded
+    if (alertDict && recentAlerts.length) {
+      recentAlerts = recentAlerts.map(a => {
+        const entry = alertDict[a.name];
+        if (entry) {
+          return { ...a, description: entry.d, customer_facing_message: entry.m, models: entry.v };
+        }
+        return a;
+      });
+    }
   } catch (_) { /* Alerts are supplementary, don't fail refresh */ }
+}
+
+async function loadAlertDict() {
+  if (alertDict) return alertDict;
+  try {
+    alertDict = await fetchJ('/alerts.json');
+    console.log(`Alert dictionary loaded: ${Object.keys(alertDict).length} entries`);
+    return alertDict;
+  } catch (e) {
+    console.warn('Failed to load alert dictionary:', e);
+    return null;
+  }
 }
 
 function startSSE() {
@@ -1651,7 +1674,9 @@ function schedCharge() { const [h,m] = document.getElementById('sched-time').val
 // ═════════════════════════════════════════════════════════════════════════════
 // HEALTH SHEET
 // ═════════════════════════════════════════════════════════════════════════════
-function renderHealthSheet() {
+async function renderHealthSheet() {
+  // Load alert dictionary on first view of health sheet
+  if (!alertDict) await loadAlertDict();
   const cs = vData?.charge_state, vs = vData?.vehicle_state;
   const ideal = cs?.ideal_battery_range || 0, rated = cs?.battery_range || 0;
   const hp = ideal > 0 ? Math.round((rated/ideal)*100) : null;
