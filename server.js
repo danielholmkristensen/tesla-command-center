@@ -20,6 +20,17 @@ const server = http.createServer(app);
 const wss    = new WebSocket.Server({ server, path: "/fleet-telemetry" });
 app.use(express.json());
 
+// Force no-cache for HTML to prevent stale versions
+app.use((req, res, next) => {
+  if (req.path === '/' || req.path.endsWith('.html')) {
+    res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+    res.setHeader('Pragma', 'no-cache');
+    res.setHeader('Expires', '0');
+    res.setHeader('Surrogate-Control', 'no-store');
+  }
+  next();
+});
+
 // ── Config ────────────────────────────────────────────────────────────────────
 const PORT       = process.env.PORT || 3000;
 const REGION     = process.env.TESLA_API_REGION || "eu";
