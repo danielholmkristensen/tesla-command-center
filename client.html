@@ -1004,6 +1004,7 @@ let tel = { signals: {}, alerts: [], connected: false };
 let geofence = { active: false, center: null, radiusKm: 0.5, name: 'Home', status: 'UNKNOWN', history: [] };
 let moneyStep = 0, moneyAnswers = {};
 let activeSheet = null;
+let recentAlerts = []; // From Tesla /recent_alerts endpoint
 let deferredInstall = null;
 let carMap = null, fenceMap = null;
 let refreshTimer = null;
@@ -1140,9 +1141,11 @@ async function refresh() {
   }
 
   try {
-    const r = await fetchJ(`/api/vehicles/${selId}/data?endpoints=charge_state;climate_state;drive_state;vehicle_state;vehicle_config`);
+    const r = await fetchJ(`/api/vehicles/${selId}/data?endpoints=charge_state;climate_state;drive_state;location_data;vehicle_state;vehicle_config`);
     if (r.error) throw new Error(r.error);
     vData = r.response;
+    // Fetch recent alerts in background
+    fetchAlerts();
     applyLayout();
     renderStage();           // mobile stage
     if (isDesktop()) {
@@ -1151,6 +1154,17 @@ async function refresh() {
     }
     if (activeSheet) renderSheet(activeSheet); // keep open sheet fresh
   } catch (e) { toast(e.message, 'err'); }
+}
+
+async function fetchAlerts() {
+  try {
+    const r = await fetchJ(`/api/vehicles/${selId}/alerts`);
+    if (r.response?.alerts) {
+      recentAlerts = r.response.alerts.slice(0, 10); // Latest 10
+    } else if (Array.isArray(r.response)) {
+      recentAlerts = r.response.slice(0, 10);
+    }
+  } catch (_) { /* Alerts are supplementary, don't fail refresh */ }
 }
 
 function startSSE() {
@@ -1706,6 +1720,22 @@ function renderHealthSheet() {
     </div>
     ${vs?.software_update?.status === 'available' ? `<button class="btn btn-secondary" onclick="cmd('schedule_software_update',{offset_sec:3600})">Schedule OTA Update (1h)</button>` : ''}
 
+    <div class="s-label" style="margin-top:20px">Recent Vehicle Alerts</div>
+    ${recentAlerts.length ? `
+      <div class="glass-card" style="margin-bottom:12px">
+        ${recentAlerts.map(a => `
+          <div class="glass-row" style="flex-direction:column;align-items:flex-start;gap:4px">
+            <span class="row-label" style="font-size:11px;color:var(--amber)">${a.name || 'ALERT'}</span>
+            <span class="row-value" style="font-size:14px;font-weight:500">${a.title || a.customer_facing_message || a.description || 'Vehicle alert'}</span>
+            ${a.timestamp ? `<span style="font-size:11px;color:var(--g3)">${new Date(a.timestamp).toLocaleString()}</span>` : ''}
+          </div>
+        `).join('')}
+      </div>
+    ` : `
+      <div class="info-box" style="margin-bottom:12px">No recent alerts from vehicle.</div>
+    `}
+    <button class="btn btn-secondary" style="margin-bottom:20px" onclick="fetchAlerts().then(()=>renderHealthSheet())">Refresh Alerts</button>
+
     <div class="s-label" style="margin-top:20px">Actions</div>
     <div class="ctrl-row">
       <div class="ctrl-btn amber" onclick="cmd('reboot_media_unit')"><div class="ci">🔄</div>Reboot MCU</div>
@@ -1961,7 +1991,13 @@ function faults() {
   if (vs?.df || vs?.dr || vs?.pf || vs?.pr) add('critical', 'DOOR_AJAR', 'Door Not Closed', 'Do not drive until resolved.');
   if (vs?.ft) add('critical', 'FRUNK_OPEN', 'Frunk Unlatched', 'Front trunk is open.');
   if (vs?.software_update?.status === 'available') add('info', 'SW_UPDATE', 'Update Available', `Firmware ${vs.software_update.version || ''} ready.`);
-  add('warn', 'MCU_AUDIO_a001', 'Audio System Fault', 'Horn/chimes unavailable. Reboot MCU recommended.');
+  // Real alerts added from /api/vehicles/:id/alerts endpoint via recentAlerts array
+  if (recentAlerts.length) {
+    recentAlerts.forEach(a => {
+      const sev = a.severity === 'CRITICAL' ? 'critical' : a.severity === 'WARNING' ? 'warn' : 'info';
+      add(sev, a.name || 'ALERT', a.title || a.name, a.description || a.customer_facing_message || 'Alert from vehicle');
+    });
+  }
   const t = tel.signals || {};
   if (t.IsolationResistance != null && t.IsolationResistance < 100) add('critical', 'HVIL_ISO', 'Isolation Resistance Low', t.IsolationResistance + ' kΩ — service required.');
   if (t.Hvil === false) add('critical', 'HVIL_OPEN', 'HVIL Loop Open', 'High Voltage Interlock interrupted.');

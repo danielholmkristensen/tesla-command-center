@@ -375,6 +375,22 @@ app.post("/api/vehicles/:id/command/:cmd", async (req, res) => {
   catch (e) { res.status(500).json({ error: e.message }); }
 });
 
+// Recent alerts from vehicle
+app.get("/api/vehicles/:id/alerts", async (req, res) => {
+  try {
+    const d = await tesla("get", `/vehicles/${req.params.id}/recent_alerts`);
+    res.json(d);
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// Release notes
+app.get("/api/vehicles/:id/release_notes", async (req, res) => {
+  try {
+    const d = await tesla("get", `/vehicles/${req.params.id}/release_notes`);
+    res.json(d);
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
 // Geo-fence
 app.get("/api/geofence", (req, res) => res.json(geofence));
 app.post("/api/geofence", (req, res) => {
