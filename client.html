@@ -1064,6 +1064,16 @@ async function boot() {
   // Install prompt
   window.addEventListener('beforeinstallprompt', e => { e.preventDefault(); deferredInstall = e; });
 
+  // Check for OAuth success redirect
+  const params = new URLSearchParams(window.location.search);
+  if (params.get('auth') === 'success') {
+    // Clean URL and fast-track to app
+    history.replaceState({}, '', '/');
+    document.getElementById('splash').style.display = 'none';
+    launchApp();
+    return;
+  }
+
   // Splash: wait for animation then decide
   await sleep(1400);
   document.getElementById('splash').classList.add('fade');
