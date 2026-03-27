@@ -1,68 +1,141 @@
-# Tesla Dashboard
+# Tesla Command Center
 
-## Mac Setup (2 minutes)
+> Personal Tesla dashboard with real-time vehicle control, diagnostics, and monitoring.
 
-1. **Double-click `setup.command`** — installs Node.js check, deps, optional auto-start and menu bar
-2. **Double-click `start.command`** — starts server, opens browser automatically
-3. **Get your token** at [tesla-auth.netlify.app](https://tesla-auth.netlify.app) → paste in the onboarding screen
-4. **Add to Dock**: Safari → Share → **Add to Dock** → looks and behaves like a native Mac app
-
-**Auto-start on login:** Setup script offers to configure this. Edit `~/Library/LaunchAgents/dev.tesla-dashboard.plist` with your token after.
-
-**Menu bar:** `menubar.5m.sh` installs automatically if SwiftBar is present. Shows battery %, lock state, sentry status. Lock/unlock/flash/honk from the menu bar without opening a browser.
-
-**Keyboard shortcuts** (when in browser):
-
-| Key | Action |
-|-----|--------|
-| `L` | Lock |
-| `U` | Unlock |
-| `F` | Flash lights |
-| `H` | Honk |
-| `C` | Start climate |
-| `1–6` | Open tile (Location, Climate, Charge, Health, Sentry, Save) |
+**Live:** [commandcenter.agency](https://commandcenter.agency)
 
 ---
 
-## iPhone Setup (1 minute)
+## Quick Start
 
-1. Make sure your Mac is running the dashboard (start.command)
-2. Your Mac and iPhone must be on the **same WiFi**
-3. Open Safari on iPhone → go to `http://YOUR-MAC-IP:3000`
-   (IP is shown in the terminal when you run start.command)
-4. Safari → Share → **Add to Home Screen**
-5. Paste your token in the onboarding — done
+### Cloud (Recommended)
 
----
+1. Visit [commandcenter.agency](https://commandcenter.agency)
+2. Click **"Connect Tesla"** — authenticates via Tesla OAuth
+3. Add to Home Screen (iOS/Android) or Dock (macOS)
 
-## Glitch / Cloud Deployment
+### Self-Hosted
 
-Drop all files into a Glitch project. Set in `.env`:
+```bash
+git clone https://github.com/danielholmkristensen/tesla-command-center.git
+cd tesla-command-center
+npm install
 ```
-TESLA_REFRESH_TOKEN=your_token_here
-TESLA_API_REGION=eu
+
+Set environment variables:
+```bash
+export TESLA_CLIENT_ID="your-client-id"
+export TESLA_CLIENT_SECRET="your-client-secret"
 ```
-Open the Glitch URL on your phone → Add to Home Screen.
+
+```bash
+npm start
+# Open http://localhost:3000
+```
 
 ---
 
-## Files
+## Features
 
-| File | Purpose |
-|------|---------|
-| `server.js` | Node.js backend (API proxy, geo-fence, telemetry) |
-| `client.html` | PWA frontend (adapts to phone + Mac) |
-| `start.command` | Double-click to start on Mac |
-| `setup.command` | First-time Mac setup |
-| `menubar.5m.sh` | SwiftBar menu bar plugin |
-| `render.yaml` | One-click Render.com cloud deployment |
-| `Dockerfile.proxy` | Tesla Vehicle Command Proxy (unlocks all commands) |
-| `PROXY_SETUP.md` | Proxy setup guide |
+| Feature | Description |
+|---------|-------------|
+| **Battery & Range** | Real-time charge state, range estimation, charging controls |
+| **Climate** | Pre-condition, seat heaters, window venting |
+| **Location** | Live map, Flash/Honk/Open micro-actions |
+| **Sentry** | Enable/disable, geo-fence alerts, dashcam triggers |
+| **Diagnostics** | Battery health, degradation analysis, fault detection |
+| **Save Money** | Charging cost optimization for Danish market |
 
 ---
 
-## Token expiry
+## Architecture
 
-Tesla refresh tokens expire after ~8 hours of inactivity. If the app shows a connection error:
-- On Mac: open `start.command` again (re-onboarding is automatic if token is stale)
-- Set `TESLA_REFRESH_TOKEN` in the LaunchAgent plist for permanent background operation
+See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for:
+- System context and containers (C4 model)
+- Component breakdown
+- Data flow diagrams
+- Deployment topology
+
+---
+
+## Documentation
+
+| Document | Purpose |
+|----------|---------|
+| [ARCHITECTURE.md](docs/ARCHITECTURE.md) | System design (arc42 structure) |
+| [API.md](docs/API.md) | REST API reference |
+| [ADR/](docs/adr/) | Architecture Decision Records |
+| [DEPLOYMENT.md](docs/DEPLOYMENT.md) | Railway, Vercel, Docker setup |
+| [SECURITY.md](docs/SECURITY.md) | OAuth flow, token handling, data privacy |
+
+---
+
+## Tech Stack
+
+- **Runtime:** Node.js 20+
+- **Framework:** Express.js
+- **Real-time:** WebSocket (Fleet Telemetry), Server-Sent Events
+- **Frontend:** Vanilla JS, PWA, Service Worker
+- **Deployment:** Railway / Docker
+- **Auth:** Tesla Fleet API OAuth 2.0
+
+---
+
+## Environment Variables
+
+| Variable | Required | Description |
+|----------|----------|-------------|
+| `TESLA_CLIENT_ID` | Yes | Tesla Developer App client ID |
+| `TESLA_CLIENT_SECRET` | Yes | Tesla Developer App client secret |
+| `TESLA_API_REGION` | No | `eu` (default) or `na` |
+| `PORT` | No | Server port (default: 3000) |
+
+---
+
+## Project Structure
+
+```
+tesla-command-center/
+├── server.js           # Express server, API routes, OAuth, WebSocket
+├── client.html         # PWA frontend (single-file, no build step)
+├── package.json        # Dependencies
+├── railway.json        # Railway deployment config
+├── .well-known/        # Tesla public key for Fleet API
+├── keys/               # EC keypair (private key gitignored)
+├── docs/               # Architecture & API documentation
+│   ├── ARCHITECTURE.md
+│   ├── API.md
+│   ├── DEPLOYMENT.md
+│   ├── SECURITY.md
+│   └── adr/            # Architecture Decision Records
+├── start.command       # macOS launcher
+├── setup.command       # macOS first-time setup
+└── menubar.5m.sh       # SwiftBar menu bar plugin
+```
+
+---
+
+## Contributing
+
+1. Fork the repository
+2. Create a feature branch (`git checkout -b feature/amazing`)
+3. Commit changes (`git commit -m 'Add amazing feature'`)
+4. Push to branch (`git push origin feature/amazing`)
+5. Open a Pull Request
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for code style and PR guidelines.
+
+---
+
+## License
+
+MIT License. See [LICENSE](LICENSE).
+
+---
+
+## Acknowledgments
+
+- [Tesla Fleet API](https://developer.tesla.com/docs/fleet-api)
+- [Clean Code](https://www.oreilly.com/library/view/clean-code-a/9780136083238/) by Robert C. Martin
+- [arc42](https://arc42.org/) documentation template
+- [C4 Model](https://c4model.com/) for architecture visualization
