@@ -1031,8 +1031,13 @@ window.addEventListener('resize', () => {
 
 function applyLayout() {
   const desktop = isDesktop();
-  document.getElementById('stage').style.display      = desktop ? 'none' : '';
+  console.log('🖥️ applyLayout:', desktop ? 'DESKTOP' : 'MOBILE', 'width:', window.innerWidth);
+  document.getElementById('stage').style.display      = desktop ? 'none' : 'block';
   document.getElementById('app-body').style.display   = desktop ? 'flex'  : 'none';
+  // Force visibility
+  if (desktop) {
+    document.getElementById('app-body').style.cssText = 'display: flex !important; flex: 1; overflow: hidden;';
+  }
 }
 
 // Keyboard shortcuts (Mac only — desktop breakpoint)
@@ -1416,6 +1421,7 @@ function showTile(id) {
 
 // ── Desktop Sidebar ──────────────────────────────────────────────────────────
 function renderSidebar() {
+  console.log('📱 renderSidebar called');
   const cs = vData?.charge_state, vs = vData?.vehicle_state;
   const pct = cs?.battery_level ?? 0;
   const km  = Math.round((cs?.est_battery_range || 0) * 1.609);
@@ -1472,12 +1478,14 @@ function renderSidebar() {
 
 // ── Desktop Panel ────────────────────────────────────────────────────────────
 function renderPanel(id) {
+  console.log('📊 renderPanel:', id);
   // Destroy maps when switching panels
   if (carMap   && id !== 'location') { carMap.remove();   carMap = null; }
   if (fenceMap && id !== 'sentry')   { fenceMap.remove(); fenceMap = null; }
 
   const titles = { location: 'Location', climate: 'Climate', charge: 'Charging', health: 'Diagnostics', sentry: 'Sentry & Fence', money: 'Save Money' };
   const container = document.getElementById('panel-inner');
+  if (!container) { console.error('❌ panel-inner not found!'); return; }
   container.innerHTML = `<div class="panel-title">${titles[id] || id}</div><div id="panel-content"></div>`;
 
   // Temporarily reroute sheet body IDs so existing render functions write into panel
