@@ -1,0 +1,16 @@
+{
+  "name": "tesla-dashboard",
+  "version": "5.0.0",
+  "description": "Tesla PWA — Location, Geo-fence, Save Money, Fleet Telemetry",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "menubar": "open -a SwiftBar || echo 'Install SwiftBar: brew install swiftbar'"
+  },
+  "dependencies": {
+    "express": "^4.18.0",
+    "axios": "^1.6.0",
+    "ws": "^8.16.0"
+  },
+  "engines": { "node": ">=18" }
+}

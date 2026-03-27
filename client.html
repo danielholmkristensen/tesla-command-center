@@ -1,0 +1,2051 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Tesla">
+<meta name="theme-color" content="#000000">
+<link rel="manifest" href="/manifest.json">
+<link rel="apple-touch-icon" href="/icon.svg">
+<title>Tesla</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@200;300;400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<style>
+/* ── Reset & Tokens ─────────────────────────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+:root {
+  --red:    #E31937;
+  --green:  #34C759;
+  --blue:   #0A84FF;
+  --amber:  #FF9F0A;
+  --purple: #BF5AF2;
+  --white:  #FFFFFF;
+  --g1: rgba(255,255,255,0.92);
+  --g2: rgba(255,255,255,0.55);
+  --g3: rgba(255,255,255,0.30);
+  --g4: rgba(255,255,255,0.12);
+  --g5: rgba(255,255,255,0.06);
+  --g6: rgba(255,255,255,0.03);
+  --sat: env(safe-area-inset-top,    0px);
+  --sab: env(safe-area-inset-bottom, 0px);
+  --font: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Inter', sans-serif;
+}
+html, body {
+  background: #000;
+  color: var(--white);
+  font-family: var(--font);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  height: 100%;
+  overflow: hidden;
+}
+
+/* ── Splash ─────────────────────────────────────────────────────────── */
+#splash {
+  position: fixed; inset: 0; z-index: 1000;
+  background: #000;
+  display: flex; align-items: center; justify-content: center;
+  transition: opacity 0.5s ease;
+}
+#splash.fade { opacity: 0; pointer-events: none; }
+.splash-t {
+  color: var(--red);
+  font-size: 88px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  transform: scale(0.4);
+  opacity: 0;
+  animation: splashIn 0.9s cubic-bezier(0.34, 1.56, 0.64, 1) 0.2s forwards;
+}
+@keyframes splashIn {
+  to { transform: scale(1); opacity: 1; }
+}
+
+/* ── Onboarding ─────────────────────────────────────────────────────── */
+#onboard {
+  position: fixed; inset: 0; z-index: 900;
+  background: #000;
+  display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
+  padding: calc(var(--sat) + 24px) 32px calc(var(--sab) + 32px);
+}
+.ob-step {
+  display: none; flex-direction: column; align-items: center;
+  text-align: center; gap: 0; width: 100%; max-width: 360px;
+}
+.ob-step.active { display: flex; animation: obIn 0.4s ease forwards; }
+@keyframes obIn {
+  from { opacity: 0; transform: translateY(20px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.ob-icon {
+  font-size: 72px; margin-bottom: 32px;
+  animation: obIcon 0.6s cubic-bezier(0.34, 1.56, 0.64, 1) 0.1s both;
+}
+@keyframes obIcon {
+  from { transform: scale(0.5); opacity: 0; }
+  to   { transform: scale(1); opacity: 1; }
+}
+.ob-title {
+  font-size: 38px; font-weight: 700; letter-spacing: -0.03em;
+  line-height: 1.1; margin-bottom: 16px; color: var(--g1);
+}
+.ob-sub {
+  font-size: 17px; font-weight: 400; line-height: 1.55;
+  color: var(--g3); margin-bottom: 48px;
+}
+.ob-link { color: var(--blue); text-decoration: none; }
+.ob-input {
+  width: 100%; background: rgba(255,255,255,0.07);
+  border: 1px solid rgba(255,255,255,0.12);
+  border-radius: 14px; color: var(--white);
+  font-family: var(--font); font-size: 15px;
+  padding: 17px 20px; outline: none;
+  margin-bottom: 20px;
+  transition: border-color 0.2s;
+}
+.ob-input:focus { border-color: rgba(255,255,255,0.3); }
+.ob-input::placeholder { color: var(--g3); }
+.ob-err {
+  color: var(--red); font-size: 14px; line-height: 1.4;
+  margin-bottom: 16px; display: none;
+}
+.ob-progress {
+  position: absolute; bottom: calc(var(--sab) + 48px);
+  left: 0; right: 0; display: flex; justify-content: center; gap: 8px;
+}
+.ob-dot {
+  width: 6px; height: 6px; border-radius: 50%;
+  background: rgba(255,255,255,0.25); transition: all 0.3s;
+}
+.ob-dot.active { background: var(--white); transform: scale(1.2); }
+
+/* ── Success checkmark ──────────────────────────────────────────────── */
+.check-circle {
+  width: 80px; height: 80px; border-radius: 50%;
+  background: var(--green);
+  display: flex; align-items: center; justify-content: center;
+  margin-bottom: 32px;
+  animation: checkIn 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+}
+@keyframes checkIn {
+  from { transform: scale(0); }
+  to   { transform: scale(1); }
+}
+.check-circle svg { width: 40px; height: 40px; }
+.check-path {
+  stroke-dasharray: 50;
+  stroke-dashoffset: 50;
+  animation: drawCheck 0.4s ease 0.3s forwards;
+}
+@keyframes drawCheck { to { stroke-dashoffset: 0; } }
+
+/* ── Buttons ────────────────────────────────────────────────────────── */
+.btn {
+  width: 100%; padding: 17px 24px;
+  border: none; border-radius: 14px;
+  font-family: var(--font); font-size: 17px; font-weight: 600;
+  cursor: pointer; transition: transform 0.1s, opacity 0.1s;
+  display: flex; align-items: center; justify-content: center; gap: 8px;
+}
+.btn:active { transform: scale(0.97); opacity: 0.85; }
+.btn-primary   { background: var(--red); color: #fff; }
+.btn-secondary { background: rgba(255,255,255,0.1); color: var(--white); }
+.btn-glass     { background: rgba(255,255,255,0.08); color: var(--g2); border: 1px solid rgba(255,255,255,0.1); }
+.btn-sm { padding: 12px 20px; font-size: 15px; border-radius: 12px; }
+.btn-pill { border-radius: 9999px; padding: 12px 24px; font-size: 15px; }
+
+/* ── App Shell ──────────────────────────────────────────────────────── */
+#app {
+  position: fixed; inset: 0;
+  display: flex; flex-direction: column;
+  overflow: hidden;
+}
+#app-bg {
+  position: fixed; inset: 0; z-index: 0;
+  transition: background 2s ease;
+  background: radial-gradient(ellipse 100% 60% at 50% 0%, rgba(180,20,30,0.35) 0%, #000 65%);
+}
+
+/* ── Header ─────────────────────────────────────────────────────────── */
+#app-header {
+  position: relative; z-index: 10;
+  padding: calc(var(--sat) + 14px) 24px 14px;
+  display: flex; align-items: center; justify-content: space-between;
+}
+.header-logo {
+  font-size: 22px; font-weight: 700;
+  letter-spacing: -0.01em; color: var(--white);
+}
+.header-right {
+  display: flex; align-items: center; gap: 7px;
+}
+.live-dot {
+  width: 7px; height: 7px; border-radius: 50%;
+  background: var(--g3);
+  transition: background 0.5s;
+}
+.live-dot.online  { background: var(--green); animation: livePulse 2s infinite; }
+.live-dot.charging{ background: var(--blue); animation: livePulse 1.2s infinite; }
+.live-dot.asleep  { background: var(--amber); }
+@keyframes livePulse {
+  0%, 100% { opacity: 1; } 50% { opacity: 0.3; }
+}
+.header-state {
+  font-size: 12px; font-weight: 600; letter-spacing: 0.08em;
+  text-transform: uppercase; color: var(--g3);
+}
+
+/* ── Main Stage ─────────────────────────────────────────────────────── */
+#stage {
+  flex: 1; overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
+  position: relative; z-index: 5;
+}
+.stage-inner {
+  padding: 12px 20px calc(var(--sab) + 24px);
+  max-width: 430px; margin: 0 auto;
+  display: flex; flex-direction: column; gap: 12px;
+}
+
+/* ── Battery Hero ───────────────────────────────────────────────────── */
+.battery-hero {
+  padding: 28px 24px 24px;
+  position: relative;
+}
+.battery-pct-row {
+  display: flex; align-items: flex-end; gap: 4px;
+  margin-bottom: 12px;
+}
+.battery-num {
+  font-size: 108px; font-weight: 200;
+  letter-spacing: -0.05em; line-height: 1;
+  color: var(--white);
+  transition: color 0.5s;
+  font-variant-numeric: tabular-nums;
+}
+.battery-symbol {
+  font-size: 36px; font-weight: 300;
+  letter-spacing: -0.02em; color: var(--g3);
+  margin-bottom: 16px;
+}
+.battery-track {
+  height: 3px; background: rgba(255,255,255,0.1);
+  border-radius: 2px; overflow: hidden; margin-bottom: 14px;
+}
+.battery-fill {
+  height: 100%; border-radius: 2px;
+  transition: width 1.2s cubic-bezier(0.4, 0, 0.2, 1), background 0.8s;
+  background: var(--green);
+}
+.battery-status {
+  font-size: 15px; font-weight: 400;
+  color: var(--g3); letter-spacing: -0.01em;
+  display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+}
+.battery-status .sep { color: rgba(255,255,255,0.15); }
+.charging-badge {
+  display: inline-flex; align-items: center; gap: 4px;
+  font-size: 12px; font-weight: 600; letter-spacing: 0.06em;
+  color: var(--blue); text-transform: uppercase;
+}
+.charging-dot { animation: chargePulse 1s steps(2) infinite; }
+@keyframes chargePulse { 50% { opacity: 0.1; } }
+
+/* ── Context Card ───────────────────────────────────────────────────── */
+.ctx-card {
+  background: rgba(255,255,255,0.07);
+  border: 1px solid rgba(255,255,255,0.1);
+  border-radius: 20px;
+  padding: 16px 18px;
+  display: flex; align-items: center; gap: 14px;
+  backdrop-filter: blur(30px);
+  -webkit-backdrop-filter: blur(30px);
+  animation: cardIn 0.4s ease;
+}
+@keyframes cardIn {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.ctx-icon { font-size: 28px; flex-shrink: 0; }
+.ctx-body { flex: 1; min-width: 0; }
+.ctx-title { font-size: 15px; font-weight: 600; letter-spacing: -0.01em; color: var(--g1); }
+.ctx-sub   { font-size: 13px; font-weight: 400; color: var(--g3); margin-top: 2px; }
+.ctx-action {
+  flex-shrink: 0;
+  background: var(--red);
+  border: none; border-radius: 9999px;
+  color: #fff; font-family: var(--font);
+  font-size: 13px; font-weight: 600;
+  padding: 8px 16px; cursor: pointer;
+  transition: transform 0.1s, opacity 0.1s;
+  white-space: nowrap;
+}
+.ctx-action:active { transform: scale(0.96); opacity: 0.85; }
+
+/* ── Quick Actions ──────────────────────────────────────────────────── */
+.quick-label {
+  font-size: 11px; font-weight: 600; letter-spacing: 0.1em;
+  text-transform: uppercase; color: var(--g3);
+  padding: 0 4px 8px;
+}
+.quick-row {
+  display: flex; gap: 10px;
+}
+.quick-btn {
+  flex: 1; display: flex; flex-direction: column;
+  align-items: center; gap: 7px;
+  padding: 16px 8px;
+  background: rgba(255,255,255,0.07);
+  border: 1px solid rgba(255,255,255,0.09);
+  border-radius: 18px;
+  cursor: pointer;
+  transition: transform 0.12s cubic-bezier(0.34, 1.56, 0.64, 1), opacity 0.1s;
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+}
+.quick-btn:active { transform: scale(0.92); opacity: 0.8; }
+.quick-icon { font-size: 26px; line-height: 1; }
+.quick-lbl  {
+  font-size: 10px; font-weight: 600; letter-spacing: 0.08em;
+  text-transform: uppercase; color: var(--g2);
+}
+
+/* ── App Grid ───────────────────────────────────────────────────────── */
+.grid-label {
+  font-size: 11px; font-weight: 600; letter-spacing: 0.1em;
+  text-transform: uppercase; color: var(--g3);
+  padding: 4px 4px 8px;
+}
+.app-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+}
+.tile {
+  aspect-ratio: 1;
+  background: rgba(255,255,255,0.07);
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 22px;
+  display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
+  gap: 8px; cursor: pointer;
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  transition: transform 0.14s cubic-bezier(0.34, 1.56, 0.64, 1), opacity 0.1s;
+  position: relative; overflow: hidden;
+}
+.tile:active { transform: scale(0.90); opacity: 0.85; }
+.tile.has-alert::after {
+  content: '';
+  position: absolute; top: 10px; right: 10px;
+  width: 8px; height: 8px; border-radius: 50%;
+  background: var(--red);
+}
+.tile-icon { font-size: 30px; line-height: 1; }
+.tile-lbl  {
+  font-size: 10px; font-weight: 600; letter-spacing: 0.1em;
+  text-transform: uppercase; color: var(--g2);
+}
+.tile-sub  {
+  font-size: 11px; font-weight: 500;
+  color: var(--g3); letter-spacing: 0.02em;
+  position: absolute; bottom: 14px;
+}
+
+/* ── Overlay ────────────────────────────────────────────────────────── */
+#overlay {
+  position: fixed; inset: 0; z-index: 50;
+  background: rgba(0,0,0,0.55);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  opacity: 0; pointer-events: none;
+  transition: opacity 0.35s ease;
+}
+#overlay.show { opacity: 1; pointer-events: all; }
+
+/* ── Sheet ──────────────────────────────────────────────────────────── */
+.sheet {
+  position: fixed; left: 0; right: 0; bottom: 0; z-index: 100;
+  background: #0f0f0f;
+  border-radius: 24px 24px 0 0;
+  transform: translateY(100%);
+  transition: transform 0.42s cubic-bezier(0.32, 0.72, 0, 1);
+  max-height: 94dvh;
+  display: flex; flex-direction: column;
+  box-shadow: 0 -8px 60px rgba(0,0,0,0.7);
+}
+.sheet.open { transform: translateY(0); }
+.sheet-handle-wrap {
+  padding: 12px 0 4px; flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center;
+  cursor: pointer;
+}
+.sheet-handle {
+  width: 36px; height: 4px; border-radius: 2px;
+  background: rgba(255,255,255,0.18);
+}
+.sheet-header {
+  display: flex; align-items: center;
+  padding: 4px 20px 14px; flex-shrink: 0;
+}
+.sheet-back {
+  width: 32px; height: 32px; border-radius: 50%;
+  background: rgba(255,255,255,0.1);
+  border: none; color: var(--g2); font-size: 16px;
+  cursor: pointer; display: flex; align-items: center; justify-content: center;
+  transition: opacity 0.1s;
+}
+.sheet-back:active { opacity: 0.6; }
+.sheet-title {
+  flex: 1; text-align: center;
+  font-size: 17px; font-weight: 600; letter-spacing: -0.01em;
+  color: var(--g1); margin-left: -32px;
+}
+.sheet-body {
+  flex: 1; overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  padding: 4px 20px calc(var(--sab) + 28px);
+}
+.sheet-body::-webkit-scrollbar { display: none; }
+
+/* ── Sheet Content Components ───────────────────────────────────────── */
+.s-section { margin-bottom: 28px; }
+.s-label {
+  font-size: 11px; font-weight: 600; letter-spacing: 0.1em;
+  text-transform: uppercase; color: var(--g3);
+  margin-bottom: 10px; padding: 0 2px;
+}
+.glass-card {
+  background: rgba(255,255,255,0.05);
+  border: 1px solid rgba(255,255,255,0.07);
+  border-radius: 18px; overflow: hidden;
+}
+.glass-row {
+  padding: 15px 18px;
+  display: flex; align-items: center; justify-content: space-between;
+  border-bottom: 1px solid rgba(255,255,255,0.05);
+}
+.glass-row:last-child { border-bottom: none; }
+.row-label { font-size: 15px; font-weight: 400; color: var(--g2); }
+.row-value { font-size: 15px; font-weight: 600; color: var(--g1); letter-spacing: -0.01em; }
+.row-value.green  { color: var(--green); }
+.row-value.amber  { color: var(--amber); }
+.row-value.red    { color: var(--red); }
+.row-value.blue   { color: var(--blue); }
+
+/* Stat grid */
+.stat-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.stat-card {
+  background: rgba(255,255,255,0.05);
+  border: 1px solid rgba(255,255,255,0.07);
+  border-radius: 16px; padding: 16px;
+}
+.stat-label {
+  font-size: 11px; font-weight: 600; letter-spacing: 0.08em;
+  text-transform: uppercase; color: var(--g3); margin-bottom: 6px;
+}
+.stat-val {
+  font-size: 28px; font-weight: 300; letter-spacing: -0.02em;
+  color: var(--g1);
+}
+.stat-val.sm { font-size: 20px; font-weight: 400; }
+.stat-sub { font-size: 12px; color: var(--g3); margin-top: 3px; }
+
+/* Control buttons */
+.ctrl-row { display: flex; gap: 10px; margin-bottom: 10px; }
+.ctrl-btn {
+  flex: 1; padding: 16px 12px;
+  background: rgba(255,255,255,0.07);
+  border: 1px solid rgba(255,255,255,0.09);
+  border-radius: 16px;
+  font-family: var(--font); font-size: 14px; font-weight: 600;
+  color: var(--g1); cursor: pointer;
+  display: flex; flex-direction: column; align-items: center; gap: 7px;
+  transition: transform 0.12s cubic-bezier(0.34,1.56,0.64,1), opacity 0.1s;
+}
+.ctrl-btn:active { transform: scale(0.93); opacity: 0.8; }
+.ctrl-btn .ci { font-size: 22px; }
+.ctrl-btn.green { background: rgba(52,199,89,0.12); border-color: rgba(52,199,89,0.2); color: var(--green); }
+.ctrl-btn.blue  { background: rgba(10,132,255,0.12); border-color: rgba(10,132,255,0.2); color: var(--blue); }
+.ctrl-btn.amber { background: rgba(255,159,10,0.12); border-color: rgba(255,159,10,0.2); color: var(--amber); }
+.ctrl-btn.red   { background: rgba(227,25,55,0.12);  border-color: rgba(227,25,55,0.2);  color: var(--red); }
+.ctrl-btn.purple{ background: rgba(191,90,242,0.12); border-color: rgba(191,90,242,0.2); color: var(--purple); }
+
+/* Slider */
+.slider-group { padding: 6px 0 14px; }
+.slider-header { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 10px; }
+.slider-title { font-size: 15px; font-weight: 500; color: var(--g2); }
+.slider-val { font-size: 22px; font-weight: 300; letter-spacing: -0.02em; color: var(--g1); }
+input[type="range"] {
+  -webkit-appearance: none; width: 100%;
+  height: 4px; border-radius: 2px;
+  background: rgba(255,255,255,0.1); outline: none;
+}
+input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 22px; height: 22px; border-radius: 50%;
+  background: var(--white); cursor: pointer;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.5);
+}
+input[type="time"] {
+  background: rgba(255,255,255,0.07);
+  border: 1px solid rgba(255,255,255,0.1);
+  border-radius: 12px; color: var(--white);
+  font-family: var(--font); font-size: 22px; font-weight: 300;
+  padding: 12px 18px; outline: none; width: 100%;
+  text-align: center;
+}
+input[type="password"], input[type="text"] {
+  background: rgba(255,255,255,0.07);
+  border: 1px solid rgba(255,255,255,0.1);
+  border-radius: 12px; color: var(--white);
+  font-family: var(--font); font-size: 16px; padding: 14px 16px;
+  outline: none; width: 100%;
+}
+input[type="password"]:focus, input[type="text"]:focus {
+  border-color: rgba(255,255,255,0.3);
+}
+input::placeholder { color: var(--g3); }
+
+/* Map */
+.map-container {
+  border-radius: 18px; overflow: hidden;
+  border: 1px solid rgba(255,255,255,0.07);
+  margin-bottom: 12px;
+}
+#car-map, #fence-map { height: 240px; background: #111; }
+
+/* Find-my actions */
+.find-row {
+  display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px;
+  margin-bottom: 12px;
+}
+.find-btn {
+  background: rgba(255,255,255,0.06);
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 20px; padding: 18px 8px 14px;
+  display: flex; flex-direction: column; align-items: center; gap: 8px;
+  cursor: pointer;
+  transition: transform 0.14s cubic-bezier(0.34,1.56,0.64,1), background 0.2s;
+}
+.find-btn:active { transform: scale(0.90); background: rgba(255,255,255,0.1); }
+.find-icon { font-size: 30px; }
+.find-label { font-size: 11px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: var(--g2); }
+.find-sub   { font-size: 10px; color: var(--g3); font-weight: 400; }
+
+/* Sentry glow indicator */
+.sentry-indicator {
+  display: flex; align-items: center; gap: 14px;
+  padding: 18px; border-radius: 18px;
+  background: rgba(255,255,255,0.05);
+  border: 1px solid rgba(255,255,255,0.08);
+  margin-bottom: 14px;
+}
+.sentry-glow {
+  width: 16px; height: 16px; border-radius: 50%;
+  background: var(--g3); flex-shrink: 0;
+}
+.sentry-glow.active {
+  background: var(--red);
+  box-shadow: 0 0 12px var(--red), 0 0 24px rgba(227,25,55,0.4);
+  animation: sentryPulse 2s infinite;
+}
+@keyframes sentryPulse {
+  0%, 100% { box-shadow: 0 0 12px var(--red), 0 0 24px rgba(227,25,55,0.4); }
+  50%       { box-shadow: 0 0 20px var(--red), 0 0 40px rgba(227,25,55,0.3); }
+}
+.sentry-text {}
+.sentry-state { font-size: 17px; font-weight: 600; color: var(--g1); }
+.sentry-sub   { font-size: 13px; color: var(--g3); margin-top: 2px; }
+
+/* Fence status */
+.fence-pill {
+  display: inline-flex; align-items: center; gap: 7px;
+  padding: 6px 14px; border-radius: 9999px;
+  font-size: 13px; font-weight: 600; letter-spacing: 0.04em;
+}
+.fence-pill.inside  { background: rgba(52,199,89,0.15);  color: var(--green); }
+.fence-pill.outside { background: rgba(227,25,55,0.15);  color: var(--red); animation: fencePulse 1s infinite; }
+.fence-pill.unknown { background: rgba(255,255,255,0.08); color: var(--g3); }
+@keyframes fencePulse { 50% { opacity: 0.6; } }
+
+/* Alert items */
+.alert-item {
+  padding: 14px 0;
+  border-bottom: 1px solid rgba(255,255,255,0.05);
+}
+.alert-item:last-child { border-bottom: none; }
+.alert-name { font-size: 15px; font-weight: 500; color: var(--g1); }
+.alert-time { font-size: 13px; color: var(--g3); margin-top: 3px; }
+
+/* Money wizard */
+.money-q { margin-bottom: 4px; }
+.money-q-num { font-size: 12px; font-weight: 600; letter-spacing: 0.1em; color: var(--g3); text-transform: uppercase; margin-bottom: 12px; }
+.money-q-title { font-size: 24px; font-weight: 600; letter-spacing: -0.02em; color: var(--g1); line-height: 1.25; margin-bottom: 6px; }
+.money-q-sub   { font-size: 15px; color: var(--g3); line-height: 1.5; margin-bottom: 24px; }
+.money-opts { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 20px; }
+.money-opt {
+  background: rgba(255,255,255,0.05);
+  border: 1.5px solid rgba(255,255,255,0.07);
+  border-radius: 16px; padding: 16px 12px;
+  display: flex; flex-direction: column; align-items: center; gap: 7px;
+  cursor: pointer; text-align: center;
+  transition: transform 0.12s cubic-bezier(0.34,1.56,0.64,1), border-color 0.2s, background 0.2s;
+}
+.money-opt:active { transform: scale(0.94); }
+.money-opt.sel { border-color: var(--red); background: rgba(227,25,55,0.1); }
+.mo-icon { font-size: 26px; }
+.mo-lbl { font-size: 14px; font-weight: 600; color: var(--g1); }
+.mo-sub { font-size: 11px; color: var(--g3); }
+
+.result-item {
+  padding: 16px;
+  background: rgba(255,255,255,0.04);
+  border: 1px solid rgba(255,255,255,0.07);
+  border-radius: 16px; margin-bottom: 10px;
+}
+.result-item.best {
+  border-color: rgba(52,199,89,0.3);
+  background: rgba(52,199,89,0.06);
+}
+.result-name { font-size: 15px; font-weight: 600; color: var(--g1); margin-bottom: 6px; display: flex; align-items: center; gap: 6px; }
+.result-price { font-size: 32px; font-weight: 200; letter-spacing: -0.03em; color: var(--green); }
+.result-note { font-size: 13px; color: var(--g3); margin-top: 5px; line-height: 1.45; }
+
+.provider-row {
+  display: flex; align-items: center; gap: 12px;
+  padding: 15px 0;
+  border-bottom: 1px solid rgba(255,255,255,0.05);
+  text-decoration: none; color: inherit;
+}
+.provider-row:last-child { border-bottom: none; }
+.prov-icon-wrap {
+  width: 44px; height: 44px; border-radius: 12px;
+  background: rgba(255,255,255,0.07);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 22px; flex-shrink: 0;
+}
+.prov-body { flex: 1; min-width: 0; }
+.prov-name  { font-size: 15px; font-weight: 600; color: var(--g1); }
+.prov-price { font-size: 13px; color: var(--g3); margin-top: 2px; }
+.prov-chevron { color: var(--g3); font-size: 18px; flex-shrink: 0; }
+
+/* Health bar */
+.health-bar-bg { height: 4px; background: rgba(255,255,255,0.08); border-radius: 2px; overflow: hidden; margin-top: 6px; }
+.health-bar-fill { height: 100%; border-radius: 2px; transition: width 0.8s; }
+
+/* Info box */
+.info-box {
+  background: rgba(10,132,255,0.1);
+  border: 1px solid rgba(10,132,255,0.2);
+  border-radius: 14px; padding: 13px 16px;
+  font-size: 13px; line-height: 1.55; color: rgba(255,255,255,0.65);
+  margin-bottom: 14px;
+}
+.warn-box { background: rgba(255,159,10,0.08); border-color: rgba(255,159,10,0.2); }
+
+/* Fault items */
+.fault-item {
+  padding: 14px 16px;
+  border-radius: 16px; margin-bottom: 9px;
+  border: 1px solid rgba(255,255,255,0.07);
+  background: rgba(255,255,255,0.04);
+}
+.fault-item.critical { border-color: rgba(227,25,55,0.3); background: rgba(227,25,55,0.05); }
+.fault-item.warn     { border-color: rgba(255,159,10,0.2); background: rgba(255,159,10,0.04); }
+.fault-item.info     { border-color: rgba(10,132,255,0.2); }
+.fault-badge { display: inline-block; font-size: 10px; font-weight: 700; letter-spacing: 0.08em; padding: 3px 8px; border-radius: 6px; margin-bottom: 6px; text-transform: uppercase; }
+.badge-critical { background: var(--red); color: #fff; }
+.badge-warn     { background: var(--amber); color: #000; }
+.badge-info     { background: var(--blue); color: #fff; }
+.badge-ok       { background: var(--green); color: #000; }
+.fault-title { font-size: 15px; font-weight: 600; color: var(--g1); margin-bottom: 4px; }
+.fault-desc  { font-size: 13px; color: var(--g3); line-height: 1.45; }
+
+/* ── Toast ──────────────────────────────────────────────────────────── */
+#toast {
+  position: fixed; bottom: calc(var(--sab) + 36px); left: 50%;
+  transform: translateX(-50%) translateY(24px);
+  background: rgba(28,28,30,0.95);
+  border: 1px solid rgba(255,255,255,0.12);
+  border-radius: 12px; padding: 10px 20px;
+  font-size: 14px; font-weight: 500; letter-spacing: -0.01em;
+  color: var(--g2); z-index: 999; pointer-events: none;
+  backdrop-filter: blur(20px);
+  opacity: 0; transition: opacity 0.25s, transform 0.25s;
+  white-space: nowrap; max-width: calc(100vw - 40px); text-align: center;
+}
+#toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+#toast.ok  { color: var(--green); }
+#toast.err { color: var(--red); }
+#toast.info{ color: var(--blue); }
+
+/* Leaflet dark */
+.leaflet-tile-pane { filter: invert(1) hue-rotate(200deg) brightness(.75) contrast(1.1); }
+.leaflet-control-zoom a { background: rgba(15,15,15,0.9) !important; color: var(--white) !important; border-color: rgba(255,255,255,0.1) !important; }
+.leaflet-control-attribution { display: none !important; }
+
+/* ── Mac / Desktop Layout (≥ 768px) ──────────────────────────────────
+   Left: fixed sidebar with hero + tiles
+   Right: panel showing active tile content (no bottom sheet)
+   Keyboard shortcuts active
+──────────────────────────────────────────────────────────────────── */
+@media (min-width: 768px) {
+
+  /* Overall frame */
+  #app {
+    flex-direction: column;
+  }
+  #app-header {
+    padding: calc(var(--sat) + 18px) 32px 18px;
+    border-bottom: 1px solid rgba(255,255,255,0.06);
+  }
+  .header-logo { font-size: 24px; }
+
+  /* Two-column body */
+  #app-body {
+    display: flex; flex: 1; overflow: hidden;
+  }
+
+  /* Sidebar */
+  #sidebar {
+    width: 320px; flex-shrink: 0;
+    overflow-y: auto; -webkit-overflow-scrolling: touch;
+    border-right: 1px solid rgba(255,255,255,0.05);
+    padding: 24px 20px calc(var(--sab) + 24px);
+    display: flex; flex-direction: column; gap: 10px;
+  }
+  #sidebar::-webkit-scrollbar { display: none; }
+  #sidebar .battery-num { font-size: 80px; }
+  #sidebar .app-grid { grid-template-columns: repeat(3, 1fr); gap: 8px; }
+  #sidebar .tile { border-radius: 18px; }
+  #sidebar .tile.active-tile {
+    border-color: rgba(255,255,255,0.25);
+    background: rgba(255,255,255,0.1);
+  }
+
+  /* Main panel */
+  #panel {
+    flex: 1; overflow-y: auto; -webkit-overflow-scrolling: touch;
+    padding: 28px 36px calc(var(--sab) + 28px);
+    max-width: 680px;
+  }
+  #panel::-webkit-scrollbar { width: 4px; }
+  #panel::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 2px; }
+
+  .panel-title {
+    font-size: 28px; font-weight: 600; letter-spacing: -0.02em;
+    color: var(--g1); margin-bottom: 24px;
+  }
+
+  /* Hide mobile stage / show sidebar+panel */
+  #stage { display: none; }
+  #app-body { display: flex; }
+
+  /* Sheets are hidden on desktop — content renders in panel instead */
+  .sheet { display: none !important; }
+  #overlay { display: none !important; }
+
+  /* Desktop grid — 4-col tiles */
+  #sidebar .app-grid { grid-template-columns: repeat(3, 1fr); }
+
+  /* Quick actions horizontal */
+  #sidebar .quick-row { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  #sidebar .quick-btn { padding: 12px 8px; }
+  #sidebar .quick-icon { font-size: 22px; }
+
+  /* Wider stat grids in panel */
+  #panel .stat-grid { grid-template-columns: repeat(4, 1fr); }
+  #panel .tel-grid  { grid-template-columns: repeat(3, 1fr); }
+  #panel .ctrl-row  { max-width: 480px; }
+  #panel .glass-card { max-width: 520px; }
+
+  /* Hero in panel  */
+  #panel .battery-num-lg { font-size: 96px; }
+
+  /* Keyboard hint */
+  .kb-hint {
+    display: inline-flex; align-items: center; gap: 4px;
+    font-size: 10px; letter-spacing: 0.06em; color: var(--g3);
+    background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.08);
+    border-radius: 5px; padding: 2px 7px;
+  }
+
+  /* Asleep state in panel */
+  .asleep-state { min-height: 300px; }
+
+  /* Find buttons in panel */
+  #panel .find-row { grid-template-columns: repeat(3, 160px); }
+  #panel #car-map  { height: 320px; }
+  #panel #fence-map{ height: 280px; }
+
+  /* Money opts — 4 columns on desktop */
+  #panel .money-opts { grid-template-columns: repeat(4, 1fr); }
+}
+
+/* Breakpoint 1100px — wider sidebar */
+@media (min-width: 1100px) {
+  #sidebar { width: 360px; padding: 28px 24px; }
+  #panel   { padding: 32px 48px; }
+}
+
+
+/* Seat heater grid */
+.seat-level-row { display: flex; gap: 8px; }
+.sl-btn {
+  flex: 1; padding: 11px 0;
+  background: rgba(255,255,255,0.06);
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 12px; font-family: var(--font);
+  font-size: 16px; font-weight: 600; color: var(--g2);
+  cursor: pointer; transition: transform 0.1s, background 0.15s;
+}
+.sl-btn:active { transform: scale(0.93); }
+.sl-btn.active { background: rgba(255,159,10,0.2); border-color: rgba(255,159,10,0.3); color: var(--amber); }
+
+/* Telemetry stream items */
+.tel-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 16px; }
+.tel-cell {
+  background: rgba(255,255,255,0.04);
+  border: 1px solid rgba(255,255,255,0.06);
+  border-radius: 14px; padding: 13px 14px;
+}
+.tel-label { font-size: 10px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--g3); margin-bottom: 4px; }
+.tel-value { font-size: 18px; font-weight: 300; letter-spacing: -0.01em; color: var(--g1); }
+.tel-note  { font-size: 11px; color: var(--g3); margin-top: 2px; }
+.tel-bar   { height: 2px; border-radius: 1px; margin-top: 7px; background: rgba(255,255,255,0.06); overflow: hidden; }
+.tel-bar-fill { height: 100%; border-radius: 1px; transition: width 0.6s; }
+
+/* Onboarding vehicle name animation */
+.ob-vehicle-name {
+  font-size: 28px; font-weight: 300; letter-spacing: -0.02em;
+  color: var(--g3); margin-top: -8px; margin-bottom: 32px;
+}
+
+/* Empty state */
+.empty-state {
+  display: flex; flex-direction: column; align-items: center;
+  justify-content: center; min-height: 180px; gap: 12px;
+  color: var(--g3); font-size: 14px; letter-spacing: 0.04em;
+}
+.empty-state .ei { font-size: 40px; opacity: 0.4; }
+
+/* Asleep state */
+.asleep-state {
+  display: flex; flex-direction: column; align-items: center;
+  justify-content: center; min-height: 50dvh; gap: 24px;
+  text-align: center;
+}
+.asleep-icon { font-size: 72px; opacity: 0.6; }
+.asleep-label { font-size: 28px; font-weight: 600; color: var(--g2); letter-spacing: -0.01em; }
+.asleep-sub   { font-size: 15px; color: var(--g3); margin-top: -12px; }
+</style>
+</head>
+<body>
+
+<!-- ── Splash ─────────────────────────────────────────────────────────────── -->
+<div id="splash"><div class="splash-t">T</div></div>
+
+<!-- ── Onboarding ─────────────────────────────────────────────────────────── -->
+<div id="onboard" style="display:none">
+  <div class="ob-progress" id="ob-prog"></div>
+
+  <!-- Step 0: Welcome -->
+  <div class="ob-step active" id="ob-0">
+    <div class="ob-icon">⚡</div>
+    <div class="ob-title">Tesla.</div>
+    <div class="ob-sub">Your car, perfectly controlled.<br>From your pocket.</div>
+    <button class="btn btn-primary" onclick="obGo(1)">Begin &nbsp;›</button>
+  </div>
+
+  <!-- Step 1: Get token -->
+  <div class="ob-step" id="ob-1">
+    <div class="ob-icon">🔑</div>
+    <div class="ob-title">One key.</div>
+    <div class="ob-sub">
+      Get your Tesla refresh token at<br>
+      <a class="ob-link" href="https://tesla-auth.netlify.app" target="_blank">tesla-auth.netlify.app →</a>
+      <br><br>Log in with your Tesla account.<br>Copy the refresh_token shown.
+    </div>
+    <button class="btn btn-primary" onclick="obGo(2)">I have my token &nbsp;›</button>
+    <div style="height:12px"></div>
+    <button class="btn btn-glass" onclick="obGo(2)">Skip for now</button>
+  </div>
+
+  <!-- Step 2: Connect -->
+  <div class="ob-step" id="ob-2">
+    <div class="ob-icon">🚗</div>
+    <div class="ob-title">Connect.</div>
+    <div class="ob-sub" style="margin-bottom:28px">Paste your token below.<br>Stored securely on this device only.</div>
+    <input class="ob-input" id="ob-token" type="password" placeholder="eyJ... (refresh token)" autocomplete="off">
+    <div class="ob-err" id="ob-err"></div>
+    <button class="btn btn-primary" id="ob-connect-btn" onclick="obConnect()">Connect vehicle &nbsp;›</button>
+  </div>
+
+  <!-- Step 3: Success -->
+  <div class="ob-step" id="ob-3">
+    <div class="check-circle">
+      <svg viewBox="0 0 40 40" fill="none">
+        <path class="check-path" d="M8 20 L17 29 L32 12" stroke="white" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+    </div>
+    <div class="ob-title" id="ob-vehicle-name">Connected.</div>
+    <div class="ob-vehicle-name" id="ob-car-model"></div>
+    <div class="ob-sub" style="margin-bottom:40px">
+      For the best experience, add to your<br>home screen:
+      <br><br>Safari → Share → <strong style="color:var(--g2)">Add to Home Screen</strong>
+    </div>
+    <button class="btn btn-primary" onclick="obFinish()">Open Dashboard &nbsp;›</button>
+  </div>
+</div>
+
+<!-- ── Main App ───────────────────────────────────────────────────────────── -->
+<div id="app" style="display:none">
+  <div id="app-bg"></div>
+
+  <div id="app-header">
+    <div class="header-logo">T</div>
+    <div class="header-right">
+      <div class="live-dot" id="live-dot"></div>
+      <div class="header-state" id="header-state">—</div>
+    </div>
+  </div>
+
+  <div id="stage">
+    <div class="stage-inner" id="stage-inner">
+      <!-- Rendered by JS — mobile only -->
+    </div>
+  </div>
+
+  <!-- Desktop two-column layout (hidden on mobile via CSS) -->
+  <div id="app-body" style="display:none">
+    <div id="sidebar">
+      <div id="sidebar-inner"><!-- battery hero + quick actions + tiles --></div>
+    </div>
+    <div id="panel">
+      <div id="panel-inner"><!-- active tile content --></div>
+    </div>
+  </div>
+</div>
+
+<!-- ── Overlay ────────────────────────────────────────────────────────────── -->
+<div id="overlay" onclick="closeSheet()"></div>
+
+<!-- ── Sheets ─────────────────────────────────────────────────────────────── -->
+<div class="sheet" id="sheet-location" data-title="Location">
+  <div class="sheet-handle-wrap" onclick="closeSheet()"><div class="sheet-handle"></div></div>
+  <div class="sheet-header">
+    <button class="sheet-back" onclick="closeSheet()">✕</button>
+    <div class="sheet-title">Location</div>
+  </div>
+  <div class="sheet-body" id="body-location"></div>
+</div>
+
+<div class="sheet" id="sheet-climate" data-title="Climate">
+  <div class="sheet-handle-wrap" onclick="closeSheet()"><div class="sheet-handle"></div></div>
+  <div class="sheet-header">
+    <button class="sheet-back" onclick="closeSheet()">✕</button>
+    <div class="sheet-title">Climate</div>
+  </div>
+  <div class="sheet-body" id="body-climate"></div>
+</div>
+
+<div class="sheet" id="sheet-charge" data-title="Charging">
+  <div class="sheet-handle-wrap" onclick="closeSheet()"><div class="sheet-handle"></div></div>
+  <div class="sheet-header">
+    <button class="sheet-back" onclick="closeSheet()">✕</button>
+    <div class="sheet-title">Charging</div>
+  </div>
+  <div class="sheet-body" id="body-charge"></div>
+</div>
+
+<div class="sheet" id="sheet-health" data-title="Diagnostics">
+  <div class="sheet-handle-wrap" onclick="closeSheet()"><div class="sheet-handle"></div></div>
+  <div class="sheet-header">
+    <button class="sheet-back" onclick="closeSheet()">✕</button>
+    <div class="sheet-title">Diagnostics</div>
+  </div>
+  <div class="sheet-body" id="body-health"></div>
+</div>
+
+<div class="sheet" id="sheet-sentry" data-title="Sentry & Security">
+  <div class="sheet-handle-wrap" onclick="closeSheet()"><div class="sheet-handle"></div></div>
+  <div class="sheet-header">
+    <button class="sheet-back" onclick="closeSheet()">✕</button>
+    <div class="sheet-title">Sentry & Fence</div>
+  </div>
+  <div class="sheet-body" id="body-sentry"></div>
+</div>
+
+<div class="sheet" id="sheet-money" data-title="Save Money">
+  <div class="sheet-handle-wrap" onclick="closeSheet()"><div class="sheet-handle"></div></div>
+  <div class="sheet-header">
+    <button class="sheet-back" onclick="closeSheet()">✕</button>
+    <div class="sheet-title">Save Money</div>
+  </div>
+  <div class="sheet-body" id="body-money"></div>
+</div>
+
+<div id="toast"></div>
+
+<script>
+// ═════════════════════════════════════════════════════════════════════════════
+// STATE
+// ═════════════════════════════════════════════════════════════════════════════
+let vehicles = [], selId = null, vData = null, srvStatus = null;
+let tel = { signals: {}, alerts: [], connected: false };
+let geofence = { active: false, center: null, radiusKm: 0.5, name: 'Home', status: 'UNKNOWN', history: [] };
+let moneyStep = 0, moneyAnswers = {};
+let activeSheet = null;
+let deferredInstall = null;
+let carMap = null, fenceMap = null;
+let refreshTimer = null;
+
+// Adaptive usage tracker
+const usage = {
+  data: JSON.parse(localStorage.getItem('usage') || '{}'),
+  tap(id) { this.data[id] = (this.data[id] || 0) + 1; localStorage.setItem('usage', JSON.stringify(this.data)); },
+  top(n = 4) { return Object.entries(this.data).sort((a, b) => b[1] - a[1]).slice(0, n).map(e => e[0]); }
+};
+
+// Desktop detection — re-checked on resize
+const isDesktop = () => window.innerWidth >= 768;
+let activeTile = 'location'; // which tile is shown in panel
+
+// Handle resize — switch layout mode
+window.addEventListener('resize', () => {
+  if (vData) {
+    applyLayout();
+    renderStage();
+  }
+});
+
+function applyLayout() {
+  const desktop = isDesktop();
+  document.getElementById('stage').style.display      = desktop ? 'none' : '';
+  document.getElementById('app-body').style.display   = desktop ? 'flex'  : 'none';
+}
+
+// Keyboard shortcuts (Mac only — desktop breakpoint)
+document.addEventListener('keydown', e => {
+  if (!isDesktop() || !vData) return;
+  if (e.target.tagName === 'INPUT') return; // don't intercept inputs
+
+  const map = {
+    'l': () => cmd('door_lock'),
+    'u': () => cmd('door_unlock'),
+    'f': () => cmd('flash_lights'),
+    'h': () => cmd('honk_horn'),
+    'c': () => cmd('auto_conditioning_start'),
+    '1': () => showTile('location'),
+    '2': () => showTile('climate'),
+    '3': () => showTile('charge'),
+    '4': () => showTile('health'),
+    '5': () => showTile('sentry'),
+    '6': () => showTile('money'),
+  };
+  if (map[e.key]) { e.preventDefault(); map[e.key](); }
+});
+
+// ═════════════════════════════════════════════════════════════════════════════
+// BOOT
+// ═════════════════════════════════════════════════════════════════════════════
+async function boot() {
+  // Service Worker
+  if ('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js').catch(() => {});
+
+  // Install prompt
+  window.addEventListener('beforeinstallprompt', e => { e.preventDefault(); deferredInstall = e; });
+
+  // Splash: wait for animation then decide
+  await sleep(1400);
+  document.getElementById('splash').classList.add('fade');
+  await sleep(500);
+  document.getElementById('splash').style.display = 'none';
+
+  // Check if server already has credentials
+  try {
+    const cfg = await fetchJ('/api/configured');
+    if (cfg.configured) { launchApp(); return; }
+  } catch (_) {}
+
+  // Try re-injecting saved token
+  const saved = localStorage.getItem('tt');
+  if (saved) {
+    try {
+      const r = await fetch('/api/configure', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ refreshToken: saved })
+      });
+      const d = await r.json();
+      if (d.ok) { launchApp(); return; }
+      localStorage.removeItem('tt');
+    } catch (_) {}
+  }
+
+  showOnboard();
+}
+
+function launchApp() {
+  document.getElementById('onboard').style.display = 'none';
+  document.getElementById('app').style.display = 'flex';
+  loadApp();
+}
+
+// ═════════════════════════════════════════════════════════════════════════════
+// APP INIT
+// ═════════════════════════════════════════════════════════════════════════════
+async function loadApp() {
+  srvStatus = await fetchJ('/api/status').catch(() => null);
+  try {
+    const r = await fetchJ('/api/vehicles');
+    vehicles = r.response || [];
+    if (!vehicles.length) throw new Error('No vehicles found on this account.');
+    selId = vehicles[0].id;
+    const gf = await fetchJ('/api/geofence').catch(() => null);
+    if (gf) Object.assign(geofence, gf);
+    await refresh();
+    startSSE();
+    refreshTimer = setInterval(refresh, 30000);
+  } catch (e) {
+    setStage(`<div class="asleep-state"><div class="asleep-icon">⚠</div><div class="asleep-label">${e.message}</div></div>`);
+  }
+}
+
+async function refresh() {
+  const v = vehicles.find(x => x.id === selId);
+  updateLive(v?.state || 'unknown');
+
+  if (v?.state !== 'online') {
+    applyLayout();
+    renderAsleep(v);
+    return;
+  }
+
+  try {
+    const r = await fetchJ(`/api/vehicles/${selId}/data?endpoints=charge_state;climate_state;drive_state;vehicle_state;vehicle_config`);
+    if (r.error) throw new Error(r.error);
+    vData = r.response;
+    applyLayout();
+    renderStage();           // mobile stage
+    if (isDesktop()) {
+      renderSidebar();       // desktop sidebar
+      renderPanel(activeTile); // desktop panel
+    }
+    if (activeSheet) renderSheet(activeSheet); // keep open sheet fresh
+  } catch (e) { toast(e.message, 'err'); }
+}
+
+function startSSE() {
+  const es = new EventSource('/api/telemetry/stream');
+  es.onmessage = e => {
+    try {
+      const d = JSON.parse(e.data);
+      if (d.type === 'alert') { showGeofenceAlert(d.notification); return; }
+      tel = d;
+      if (activeSheet === 'health') renderHealthSheet();
+    } catch (_) {}
+  };
+}
+
+// ═════════════════════════════════════════════════════════════════════════════
+// STAGE RENDER
+// ═════════════════════════════════════════════════════════════════════════════
+function renderStage() {
+  const cs = vData?.charge_state;
+  const vs = vData?.vehicle_state;
+  const pct = cs?.battery_level ?? 0;
+  const km  = Math.round((cs?.est_battery_range || 0) * 1.609);
+  const isCharging = cs?.charging_state === 'Charging';
+  const isLocked = vs?.locked ?? true;
+  const tireWarn = [vs?.tpms_soft_warning_fl, vs?.tpms_soft_warning_fr, vs?.tpms_soft_warning_rl, vs?.tpms_soft_warning_rr].some(Boolean);
+
+  // Dynamic background
+  updateBackground(cs, vData?.drive_state);
+
+  // Battery fill color
+  const fillColor = pct < 20 ? '#FF453A' : pct < 40 ? '#FF9F0A' : '#34C759';
+
+  // Status line
+  const statusParts = [`${km} km`];
+  if (isCharging) statusParts.push(`<span class="charging-badge"><span class="charging-dot">⚡</span>${cs.charging_state}</span>`);
+  else statusParts.push(cs?.charging_state || '—');
+  if (isCharging && cs?.minutes_to_full_charge) statusParts.push(`${Math.round(cs.minutes_to_full_charge)}m to full`);
+
+  // Contextual card
+  const ctx = getContextCard();
+
+  // Adaptive quick actions
+  const actions = getQuickActions(isLocked);
+
+  // Tile sub-labels
+  const tileSubs = {
+    location: vData?.drive_state?.speed ? Math.round(vData.drive_state.speed * 1.609) + ' km/h' : 'Parked',
+    climate:  vData?.climate_state?.inside_temp ? Math.round(vData.climate_state.inside_temp) + '°C inside' : '',
+    charge:   pct + '%',
+    health:   faults().filter(f => f.sev !== 'info').length > 0 ? faults().filter(f=>f.sev!=='info').length + ' issue' + (faults().filter(f=>f.sev!=='info').length>1?'s':'') : 'OK',
+    sentry:   vs?.sentry_mode ? 'Active' : 'Off',
+    money:    'Optimize',
+  };
+
+  const hasAlert = faults().some(f => f.sev === 'critical');
+
+  setStage(`
+    <div class="battery-hero">
+      <div class="battery-pct-row">
+        <div class="battery-num" id="batt-num">${pct}</div>
+        <div class="battery-symbol">%</div>
+      </div>
+      <div class="battery-track">
+        <div class="battery-fill" id="batt-fill" style="width:${pct}%;background:${fillColor}"></div>
+      </div>
+      <div class="battery-status">
+        ${statusParts.map((p, i) => i > 0 ? `<span class="sep">·</span>${p}` : p).join('')}
+      </div>
+    </div>
+
+    ${ctx ? `
+    <div class="ctx-card">
+      <div class="ctx-icon">${ctx.icon}</div>
+      <div class="ctx-body">
+        <div class="ctx-title">${ctx.title}</div>
+        <div class="ctx-sub">${ctx.sub}</div>
+      </div>
+      ${ctx.cmd ? `<button class="ctx-action" onclick="${ctx.cmd}">${ctx.btnTxt}</button>` : ''}
+    </div>` : ''}
+
+    <div>
+      <div class="quick-label">Quick Actions</div>
+      <div class="quick-row">${actions}</div>
+    </div>
+
+    <div>
+      <div class="grid-label">Your Car</div>
+      <div class="app-grid">
+        <div class="tile" onclick="openSheet('location')">
+          <div class="tile-icon">📍</div>
+          <div class="tile-lbl">Location</div>
+          <div class="tile-sub">${tileSubs.location}</div>
+        </div>
+        <div class="tile" onclick="openSheet('climate')">
+          <div class="tile-icon">❄</div>
+          <div class="tile-lbl">Climate</div>
+          <div class="tile-sub">${tileSubs.climate}</div>
+        </div>
+        <div class="tile" onclick="openSheet('charge')">
+          <div class="tile-icon">🔌</div>
+          <div class="tile-lbl">Charge</div>
+          <div class="tile-sub">${tileSubs.charge}</div>
+        </div>
+        <div class="tile ${hasAlert ? 'has-alert' : ''}" onclick="openSheet('health')">
+          <div class="tile-icon">🩺</div>
+          <div class="tile-lbl">Health</div>
+          <div class="tile-sub" style="${hasAlert?'color:var(--red)':''}">${tileSubs.health}</div>
+        </div>
+        <div class="tile ${vs?.sentry_mode ? 'has-alert' : ''}" onclick="openSheet('sentry')">
+          <div class="tile-icon">👁</div>
+          <div class="tile-lbl">Sentry</div>
+          <div class="tile-sub" style="${vs?.sentry_mode?'color:var(--red)':''}">${tileSubs.sentry}</div>
+        </div>
+        <div class="tile" onclick="openSheet('money')">
+          <div class="tile-icon">💰</div>
+          <div class="tile-lbl">Save</div>
+          <div class="tile-sub">${tileSubs.money}</div>
+        </div>
+      </div>
+    </div>
+
+    <div style="height:4px"></div>
+  `);
+}
+
+function updateBackground(cs, ds) {
+  const bg = document.getElementById('app-bg');
+  const isCharging = cs?.charging_state === 'Charging';
+  const isDriving  = ds?.speed > 0;
+  const pct        = cs?.battery_level || 100;
+  let gradient;
+  if      (pct < 20)       gradient = 'radial-gradient(ellipse 110% 55% at 50% 0%, rgba(255,150,10,0.30) 0%, #000 62%)';
+  else if (isCharging)     gradient = 'radial-gradient(ellipse 110% 55% at 50% 0%, rgba(10,100,255,0.30) 0%, #000 62%)';
+  else if (isDriving)      gradient = 'radial-gradient(ellipse 110% 55% at 50% 0%, rgba(40,180,80,0.22) 0%, #000 62%)';
+  else                     gradient = 'radial-gradient(ellipse 110% 55% at 50% 0%, rgba(180,20,30,0.28) 0%, #000 62%)';
+  bg.style.background = gradient;
+}
+
+function getContextCard() {
+  if (!vData) return null;
+  const cs = vData.charge_state, cl = vData.climate_state;
+  const h = new Date().getHours();
+  if (h >= 6  && h <= 9  && !cl?.is_climate_on)   return { icon: '❄', title: 'Morning commute', sub: 'Pre-condition before you leave?', cmd: "cmd('auto_conditioning_start')", btnTxt: 'Start' };
+  if (cs?.charging_state === 'Complete')            return { icon: '✅', title: 'Charging complete', sub: cs.battery_level + '% · Unplug when ready', cmd: null };
+  if (cl?.inside_temp && cl.inside_temp > 30)      return { icon: '🌡', title: `${Math.round(cl.inside_temp)}° inside`, sub: 'Pre-cool before you get in', cmd: "cmd('auto_conditioning_start')", btnTxt: 'Cool' };
+  if (cl?.inside_temp && cl.inside_temp < 3)       return { icon: '🧊', title: `${Math.round(cl.inside_temp)}° inside`, sub: 'Pre-heat for comfort', cmd: "cmd('auto_conditioning_start')", btnTxt: 'Warm' };
+  if ((cs?.battery_level || 100) < 25 && cs?.charging_state === 'Disconnected')
+    return { icon: '🔋', title: `${cs.battery_level}% battery`, sub: 'Find a charger soon', cmd: null };
+  return null;
+}
+
+function getQuickActions(isLocked) {
+  const all = [
+    { id: 'unlock', icon: '🔓', lbl: 'Unlock',  cmd: "cmd('door_unlock')" },
+    { id: 'lock',   icon: '🔒', lbl: 'Lock',    cmd: "cmd('door_lock')" },
+    { id: 'flash',  icon: '💡', lbl: 'Flash',   cmd: "cmd('flash_lights')" },
+    { id: 'honk',   icon: '📯', lbl: 'Honk',    cmd: "cmd('honk_horn')" },
+    { id: 'climate',icon: '❄',  lbl: 'Climate', cmd: "cmd('auto_conditioning_start')" },
+    { id: 'trunk',  icon: '🚗', lbl: 'Trunk',   cmd: "cmd('actuate_trunk',{which_trunk:'rear'})" },
+  ];
+  const top = usage.top(4);
+  const sorted = top.length
+    ? [...all.filter(a => top.includes(a.id)), ...all.filter(a => !top.includes(a.id))].slice(0, 4)
+    : [all[isLocked ? 0 : 1], all[2], all[3], all[4]];
+  return sorted.map(a =>
+    `<div class="quick-btn" onclick="usage.tap('${a.id}');${a.cmd}">
+       <div class="quick-icon">${a.icon}</div>
+       <div class="quick-lbl">${a.lbl}</div>
+     </div>`
+  ).join('');
+}
+
+// ═════════════════════════════════════════════════════════════════════════════
+// SHEET SYSTEM — mobile: slides up / desktop: renders in panel
+// ═════════════════════════════════════════════════════════════════════════════
+function openSheet(id) {
+  if (isDesktop()) { showTile(id); return; } // desktop uses panel, not sheets
+  activeSheet = id;
+  const el = document.getElementById(`sheet-${id}`);
+  if (!el) return;
+  renderSheet(id);
+  document.getElementById('overlay').classList.add('show');
+  requestAnimationFrame(() => { requestAnimationFrame(() => { el.classList.add('open'); }); });
+  const handle = el.querySelector('.sheet-handle-wrap');
+  let ty0 = 0;
+  handle.addEventListener('touchstart', e => { ty0 = e.touches[0].clientY; }, { passive: true });
+  handle.addEventListener('touchend',   e => { if (e.changedTouches[0].clientY - ty0 > 70) closeSheet(); }, { passive: true });
+}
+
+function closeSheet() {
+  if (!activeSheet) return;
+  const el = document.getElementById(`sheet-${activeSheet}`);
+  el?.classList.remove('open');
+  document.getElementById('overlay').classList.remove('show');
+  activeSheet = null;
+  if (carMap)   { carMap.remove();   carMap = null; }
+  if (fenceMap) { fenceMap.remove(); fenceMap = null; }
+}
+
+// Desktop: show tile content in right panel
+function showTile(id) {
+  activeTile = id;
+  // Highlight active tile in sidebar
+  document.querySelectorAll('.tile').forEach(t => t.classList.remove('active-tile'));
+  document.querySelectorAll(`.tile[data-tile="${id}"]`).forEach(t => t.classList.add('active-tile'));
+  renderPanel(id);
+}
+
+// ── Desktop Sidebar ──────────────────────────────────────────────────────────
+function renderSidebar() {
+  const cs = vData?.charge_state, vs = vData?.vehicle_state;
+  const pct = cs?.battery_level ?? 0;
+  const km  = Math.round((cs?.est_battery_range || 0) * 1.609);
+  const isCharging = cs?.charging_state === 'Charging';
+  const fillColor = pct < 20 ? '#FF453A' : pct < 40 ? '#FF9F0A' : '#34C759';
+  const isLocked = vs?.locked ?? true;
+  const tileData = getTileData();
+  const actions = getQuickActions(isLocked);
+
+  document.getElementById('sidebar-inner').innerHTML = `
+    <div class="battery-hero" style="padding:0 0 20px">
+      <div class="battery-pct-row">
+        <div class="battery-num">${pct}</div>
+        <div class="battery-symbol">%</div>
+      </div>
+      <div class="battery-track">
+        <div class="battery-fill" style="width:${pct}%;background:${fillColor}"></div>
+      </div>
+      <div class="battery-status" style="margin-top:8px">
+        ${km} km
+        ${isCharging ? `<span class="sep">·</span><span class="charging-badge"><span class="charging-dot">⚡</span>${cs.charging_state}</span>` : ''}
+        ${isCharging && cs?.minutes_to_full_charge ? `<span class="sep">·</span>${Math.round(cs.minutes_to_full_charge)}m` : ''}
+      </div>
+    </div>
+
+    <div>
+      <div class="quick-label">Quick Actions</div>
+      <div class="quick-row">${actions}</div>
+    </div>
+
+    <div>
+      <div class="grid-label">Your Car</div>
+      <div class="app-grid">
+        ${tileData.map(t => `
+          <div class="tile ${activeTile === t.id ? 'active-tile' : ''} ${t.alert ? 'has-alert' : ''}"
+               data-tile="${t.id}" onclick="showTile('${t.id}')">
+            <div class="tile-icon">${t.icon}</div>
+            <div class="tile-lbl">${t.lbl}</div>
+            <div class="tile-sub" style="${t.alertColor ? 'color:' + t.alertColor : ''}">${t.sub}</div>
+          </div>`).join('')}
+      </div>
+    </div>
+
+    <div style="margin-top:8px;padding-top:8px;border-top:1px solid rgba(255,255,255,0.05)">
+      <div style="display:flex;flex-wrap:wrap;gap:6px">
+        ${[['L','Lock'],['U','Unlock'],['F','Flash'],['H','Honk'],['C','Climate']].map(([k,l]) =>
+          `<span class="kb-hint"><span style="color:var(--g2)">${k}</span> ${l}</span>`
+        ).join('')}
+        <span class="kb-hint">1–6 Tiles</span>
+      </div>
+    </div>
+  `;
+}
+
+// ── Desktop Panel ────────────────────────────────────────────────────────────
+function renderPanel(id) {
+  // Destroy maps when switching panels
+  if (carMap   && id !== 'location') { carMap.remove();   carMap = null; }
+  if (fenceMap && id !== 'sentry')   { fenceMap.remove(); fenceMap = null; }
+
+  const titles = { location: 'Location', climate: 'Climate', charge: 'Charging', health: 'Diagnostics', sentry: 'Sentry & Fence', money: 'Save Money' };
+  const container = document.getElementById('panel-inner');
+  container.innerHTML = `<div class="panel-title">${titles[id] || id}</div><div id="panel-content"></div>`;
+
+  // Temporarily reroute sheet body IDs so existing render functions write into panel
+  const redirect = {
+    location: 'body-location',
+    climate:  'body-climate',
+    charge:   'body-charge',
+    health:   'body-health',
+    sentry:   'body-sentry',
+    money:    'body-money',
+  };
+
+  // Create a proxy element with the expected ID
+  const proxy = document.createElement('div');
+  proxy.id = redirect[id];
+  document.getElementById('panel-content').appendChild(proxy);
+
+  const renders = {
+    location: renderLocationSheet,
+    climate:  renderClimateSheet,
+    charge:   renderChargeSheet,
+    health:   renderHealthSheet,
+    sentry:   renderSentrySheet,
+    money:    () => { if (!proxy.innerHTML) renderMoneyWizard(); },
+  };
+  (renders[id] || (() => {}))();
+}
+
+function getTileData() {
+  const cs = vData?.charge_state, vs = vData?.vehicle_state;
+  const cl = vData?.climate_state;
+  const f = faults().filter(x => x.sev !== 'info');
+  return [
+    { id: 'location', icon: '📍', lbl: 'Location', sub: vData?.drive_state?.speed ? Math.round(vData.drive_state.speed * 1.609) + ' km/h' : 'Parked', alert: false },
+    { id: 'climate',  icon: '❄',  lbl: 'Climate',  sub: cl?.inside_temp ? Math.round(cl.inside_temp) + '°C' : '', alert: false },
+    { id: 'charge',   icon: '🔌', lbl: 'Charge',   sub: (cs?.battery_level ?? '—') + '%', alert: false },
+    { id: 'health',   icon: '🩺', lbl: 'Health',   sub: f.length ? f.length + ' issue' + (f.length > 1 ? 's' : '') : 'OK', alert: f.length > 0, alertColor: f.length ? 'var(--red)' : null },
+    { id: 'sentry',   icon: '👁',  lbl: 'Sentry',   sub: vs?.sentry_mode ? 'Active' : 'Off', alert: vs?.sentry_mode, alertColor: vs?.sentry_mode ? 'var(--red)' : null },
+    { id: 'money',    icon: '💰', lbl: 'Save',      sub: 'Optimize', alert: false },
+  ];
+}
+
+// ═════════════════════════════════════════════════════════════════════════════
+// LOCATION SHEET
+// ═════════════════════════════════════════════════════════════════════════════
+function renderLocationSheet() {
+  const ds = vData?.drive_state;
+  const body = document.getElementById('body-location');
+  body.innerHTML = `
+    <div class="find-row">
+      <div class="find-btn" onclick="findAction('flash')">
+        <div class="find-icon">💡</div>
+        <div class="find-label">Flash</div>
+        <div class="find-sub">You see it</div>
+      </div>
+      <div class="find-btn" onclick="findAction('honk')">
+        <div class="find-icon">📯</div>
+        <div class="find-label">Honk</div>
+        <div class="find-sub">You hear it</div>
+      </div>
+      <div class="find-btn" onclick="findAction('open')">
+        <div class="find-icon">🔓</div>
+        <div class="find-label">Open</div>
+        <div class="find-sub">You found it</div>
+      </div>
+    </div>
+    <div class="map-container"><div id="car-map"></div></div>
+    ${ds?.latitude ? `
+    <div class="glass-card" style="margin-bottom:12px">
+      <div class="glass-row">
+        <span class="row-label">Coordinates</span>
+        <span class="row-value" style="font-size:13px;font-family:monospace">${ds.latitude.toFixed(5)}, ${ds.longitude.toFixed(5)}</span>
+      </div>
+      <div class="glass-row">
+        <span class="row-label">Speed</span>
+        <span class="row-value">${ds.speed ? Math.round(ds.speed * 1.609) + ' km/h' : 'Parked'}</span>
+      </div>
+    </div>
+    <button class="btn btn-secondary" onclick="openInMaps()">Open in Maps &nbsp;›</button>
+    ` : '<div class="info-box warn-box">Location requires vehicle_location scope. Grant it during the Tesla auth flow.</div>'}
+  `;
+  requestAnimationFrame(() => initCarMap(ds));
+}
+
+function initCarMap(ds) {
+  const el = document.getElementById('car-map');
+  if (!el || carMap) return;
+  const lat = ds?.latitude || 55.676, lon = ds?.longitude || 12.568;
+  carMap = L.map('car-map', { zoomControl: true, attributionControl: false }).setView([lat, lon], 15);
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(carMap);
+  if (ds?.latitude) {
+    const icon = L.divIcon({ html: '<div style="width:18px;height:18px;border-radius:50%;background:#E31937;border:2.5px solid #fff;box-shadow:0 0 14px rgba(227,25,55,.6)"></div>', iconSize: [18,18], iconAnchor: [9,9] });
+    L.marker([lat, lon], { icon }).addTo(carMap);
+    L.circle([lat, lon], { radius: 25, color: '#E31937', fillColor: '#E31937', fillOpacity: 0.12, weight: 1 }).addTo(carMap);
+  }
+}
+
+async function findAction(type) {
+  if (type === 'flash') { usage.tap('flash'); await cmd('flash_lights'); }
+  else if (type === 'honk')  { usage.tap('honk');  await cmd('honk_horn'); }
+  else if (type === 'open')  { usage.tap('unlock'); await cmd('door_unlock'); }
+}
+
+function openInMaps() {
+  const ds = vData?.drive_state;
+  if (ds?.latitude) window.open(`https://maps.apple.com/?q=${ds.latitude},${ds.longitude}`, '_blank');
+}
+
+// ═════════════════════════════════════════════════════════════════════════════
+// CLIMATE SHEET
+// ═════════════════════════════════════════════════════════════════════════════
+function renderClimateSheet() {
+  const cl = vData?.climate_state;
+  if (!cl) { document.getElementById('body-climate').innerHTML = '<div class="empty-state"><div class="ei">❄</div><div>No climate data</div></div>'; return; }
+  const dT = cl.driver_temp_setting || 20;
+  const sl = cl.seat_heater_left || 0, sr = cl.seat_heater_right || 0;
+  document.getElementById('body-climate').innerHTML = `
+    <div class="stat-grid" style="margin-bottom:16px">
+      <div class="stat-card"><div class="stat-label">Inside</div><div class="stat-val">${cl.inside_temp?.toFixed(1) ?? '—'}°</div></div>
+      <div class="stat-card"><div class="stat-label">Outside</div><div class="stat-val">${cl.outside_temp?.toFixed(1) ?? '—'}°</div></div>
+    </div>
+    <div class="ctrl-row">
+      <div class="ctrl-btn green" onclick="cmd('auto_conditioning_start')"><div class="ci">❄</div>Start</div>
+      <div class="ctrl-btn amber" onclick="cmd('auto_conditioning_stop')"><div class="ci">⏹</div>Stop</div>
+    </div>
+    <div class="glass-card" style="padding:16px 18px;margin-bottom:12px">
+      <div class="slider-group">
+        <div class="slider-header">
+          <div class="slider-title">Temperature</div>
+          <div class="slider-val" id="dt-val">${dT.toFixed(1)}°C</div>
+        </div>
+        <input type="range" min="15" max="28" step="0.5" value="${dT}" id="dt-slider" oninput="document.getElementById('dt-val').textContent=parseFloat(this.value).toFixed(1)+'°C'">
+      </div>
+      <button class="btn btn-primary btn-sm" style="margin-top:12px" onclick="setTemps()">Set Temperature</button>
+    </div>
+    <div class="s-label">Seat Heaters</div>
+    <div class="glass-card" style="padding:16px 18px;margin-bottom:12px">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+        <div style="font-size:14px;color:var(--g3)">Driver</div>
+        <div class="seat-level-row">${[0,1,2,3].map(l=>`<button class="sl-btn${sl===l?' active':''}" onclick="cmd('remote_seat_heater_request',{heater:0,level:${l}})">${l}</button>`).join('')}</div>
+      </div>
+      <div style="display:flex;justify-content:space-between;align-items:center">
+        <div style="font-size:14px;color:var(--g3)">Passenger</div>
+        <div class="seat-level-row">${[0,1,2,3].map(l=>`<button class="sl-btn${sr===l?' active':''}" onclick="cmd('remote_seat_heater_request',{heater:1,level:${l}})">${l}</button>`).join('')}</div>
+      </div>
+    </div>
+    <div class="ctrl-row">
+      <div class="ctrl-btn" onclick="cmd('window_control',{command:'vent',lat:0,lon:0})"><div class="ci">↑</div>Vent</div>
+      <div class="ctrl-btn" onclick="cmd('window_control',{command:'close',lat:0,lon:0})"><div class="ci">↓</div>Close</div>
+    </div>
+  `;
+}
+function setTemps() { const d = parseFloat(document.getElementById('dt-slider').value); cmd('set_temps', { driver_temp: d, passenger_temp: d }); }
+
+// ═════════════════════════════════════════════════════════════════════════════
+// CHARGE SHEET
+// ═════════════════════════════════════════════════════════════════════════════
+function renderChargeSheet() {
+  const cs = vData?.charge_state;
+  if (!cs) { document.getElementById('body-charge').innerHTML = '<div class="empty-state"><div class="ei">🔌</div><div>No charge data</div></div>'; return; }
+  const km = Math.round((cs.est_battery_range || 0) * 1.609);
+  const fillColor = cs.battery_level < 20 ? '#FF453A' : cs.battery_level < 40 ? '#FF9F0A' : '#34C759';
+  const isC = cs.charging_state === 'Charging';
+  document.getElementById('body-charge').innerHTML = `
+    <div style="padding:8px 0 20px">
+      <div style="font-size:72px;font-weight:200;letter-spacing:-0.04em;color:var(--white);line-height:1">${cs.battery_level}<span style="font-size:24px;font-weight:300;opacity:.4">%</span></div>
+      <div class="battery-track" style="margin:10px 0 8px"><div class="battery-fill" style="width:${cs.battery_level}%;background:${fillColor}"></div></div>
+      <div style="font-size:14px;color:var(--g3)">${km} km estimated range</div>
+    </div>
+    <div class="stat-grid" style="margin-bottom:16px">
+      ${isC ? `<div class="stat-card"><div class="stat-label">Power</div><div class="stat-val">${cs.charger_power} <span style="font-size:16px;font-weight:400">kW</span></div></div>` : ''}
+      ${isC && cs.minutes_to_full_charge ? `<div class="stat-card"><div class="stat-label">To Full</div><div class="stat-val">${Math.round(cs.minutes_to_full_charge)} <span style="font-size:16px;font-weight:400">min</span></div></div>` : ''}
+      ${cs.charger_voltage ? `<div class="stat-card"><div class="stat-label">Voltage</div><div class="stat-val">${cs.charger_voltage} <span style="font-size:16px;font-weight:400">V</span></div></div>` : ''}
+      ${cs.charge_energy_added ? `<div class="stat-card"><div class="stat-label">Added</div><div class="stat-val">${cs.charge_energy_added.toFixed(1)} <span style="font-size:16px;font-weight:400">kWh</span></div></div>` : ''}
+    </div>
+    <div class="ctrl-row">
+      <div class="ctrl-btn green" onclick="cmd('charge_start')"><div class="ci">⚡</div>Start</div>
+      <div class="ctrl-btn amber" onclick="cmd('charge_stop')"><div class="ci">⏹</div>Stop</div>
+    </div>
+    <div class="glass-card" style="padding:16px 18px;margin-top:12px;margin-bottom:12px">
+      <div class="slider-group">
+        <div class="slider-header">
+          <div class="slider-title">Charge Limit</div>
+          <div class="slider-val" id="cl-val">${cs.charge_limit_soc}%</div>
+        </div>
+        <input type="range" min="50" max="100" step="5" value="${cs.charge_limit_soc}" id="cl-slider" oninput="document.getElementById('cl-val').textContent=this.value+'%'">
+      </div>
+      <button class="btn btn-primary btn-sm" style="margin-top:12px" onclick="cmd('set_charge_limit',{percent:parseInt(document.getElementById('cl-slider').value)})">Set Limit</button>
+    </div>
+    <div class="glass-card" style="padding:16px 18px;margin-bottom:12px">
+      <div class="slider-header" style="margin-bottom:10px"><div class="slider-title">Scheduled Charge</div></div>
+      <input type="time" id="sched-time" value="07:00">
+      <button class="btn btn-secondary btn-sm" style="margin-top:10px" onclick="schedCharge()">Schedule</button>
+    </div>
+  `;
+}
+function schedCharge() { const [h,m] = document.getElementById('sched-time').value.split(':').map(Number); cmd('set_scheduled_charging', { enable: true, time: h*60+m }); }
+
+// ═════════════════════════════════════════════════════════════════════════════
+// HEALTH SHEET
+// ═════════════════════════════════════════════════════════════════════════════
+function renderHealthSheet() {
+  const cs = vData?.charge_state, vs = vData?.vehicle_state;
+  const ideal = cs?.ideal_battery_range || 0, rated = cs?.battery_range || 0;
+  const hp = ideal > 0 ? Math.round((rated/ideal)*100) : null;
+  const dp = ideal > 0 ? Math.round((1-rated/ideal)*100) : null;
+  const buf = (cs?.battery_level || 0) - (cs?.usable_battery_level || 0);
+  const score = Math.max(0, Math.min(100, 100 - (dp||0) - (buf>3?5:0)));
+  const sc = score >= 80 ? 'var(--green)' : score >= 60 ? 'var(--amber)' : 'var(--red)';
+  const t = tel.signals || {};
+  const f = faults();
+
+  document.getElementById('body-health').innerHTML = `
+    <div style="padding:8px 0 20px;display:flex;align-items:baseline;gap:6px">
+      <div style="font-size:80px;font-weight:200;letter-spacing:-0.04em;color:${sc};line-height:1">${score}</div>
+      <div style="font-size:20px;font-weight:300;color:var(--g3)">/100</div>
+    </div>
+    <div class="battery-track" style="margin-bottom:8px"><div class="battery-fill" style="width:${score}%;background:${sc}"></div></div>
+    <div style="font-size:12px;color:var(--g3);letter-spacing:0.05em;text-transform:uppercase;margin-bottom:20px">Health score</div>
+
+    ${f.length ? `<div class="s-label">Active Issues (${f.length})</div>${f.map(x=>`
+      <div class="fault-item ${x.sev}">
+        <div class="fault-badge badge-${x.sev}">${x.sev}</div>
+        <div class="fault-title">${x.title}</div>
+        <div class="fault-desc">${x.desc}</div>
+      </div>`).join('')}` : `
+      <div class="fault-item" style="border-color:rgba(52,199,89,.2);background:rgba(52,199,89,.04);margin-bottom:20px">
+        <div class="fault-title" style="color:var(--green)">✓ No active faults</div>
+      </div>`
+    }
+
+    <div class="s-label">Pack Analysis</div>
+    <div class="stat-grid" style="margin-bottom:16px">
+      <div class="stat-card">
+        <div class="stat-label">Degradation</div>
+        <div class="stat-val sm" style="color:${dp===null?'var(--g3)':dp<15?'var(--green)':dp<28?'var(--amber)':'var(--red)'}">${dp !== null ? dp + '%' : 'Charge→'}</div>
+        <div class="stat-sub">${dp !== null ? (dp<15?'Normal':dp<28?'Elevated':'High') : 'Drive to measure'}</div>
+        <div class="health-bar-bg"><div class="health-bar-fill" style="width:${Math.min(100,(dp||0)*3)}%;background:${dp<15?'var(--green)':dp<28?'var(--amber)':'var(--red)'}"></div></div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Buffer Loss</div>
+        <div class="stat-val sm" style="color:${buf<=1?'var(--green)':buf<=3?'var(--amber)':'var(--red)'}">${buf.toFixed(1)}%</div>
+        <div class="stat-sub">${buf<=1?'Normal':buf<=3?'Minor variance':'Cell fault?'}</div>
+      </div>
+    </div>
+
+    <div class="s-label">Live Telemetry</div>
+    <div class="tel-grid">
+      ${telCell('Pack V', t.PackVoltage != null ? t.PackVoltage.toFixed(1)+' V' : 'Stream→', '340–410V', 'var(--blue)', t.PackVoltage ? (t.PackVoltage-300)/1.5 : 0)}
+      ${telCell('Isolation', t.IsolationResistance != null ? t.IsolationResistance+' kΩ' : 'Stream→', '>1000 kΩ safe', t.IsolationResistance && t.IsolationResistance < 100 ? 'var(--red)' : 'var(--green)', t.IsolationResistance ? Math.min(100, t.IsolationResistance/20) : 0)}
+      ${telCell('HVIL', t.Hvil != null ? (t.Hvil ? 'Closed' : 'OPEN ⚠') : 'Stream→', 'HV Interlock', t.Hvil === false ? 'var(--red)' : 'var(--green)', t.Hvil ? 100 : 0)}
+      ${telCell('Cell Δ', t.BrickVoltageMax != null && t.BrickVoltageMin != null ? ((t.BrickVoltageMax-t.BrickVoltageMin)*1000).toFixed(0)+' mV' : 'Stream→', '<50mV target', t.BrickVoltageMax && t.BrickVoltageMin && (t.BrickVoltageMax-t.BrickVoltageMin)>0.05?'var(--amber)':'var(--green)', 0)}
+      ${telCell('Mod Temp', t.ModuleTempMax != null ? t.ModuleTempMax.toFixed(1)+'°C' : 'Stream→', '<40°C target', t.ModuleTempMax && t.ModuleTempMax>40?'var(--amber)':'var(--green)', t.ModuleTempMax ? t.ModuleTempMax*2 : 0)}
+      ${telCell('BMS', t.BMSState || 'Stream→', 'Battery Mgmt', 'var(--blue)', 0)}
+    </div>
+    <div class="info-box" style="margin-top:4px">Stream→ signals activate when Fleet Telemetry is configured.</div>
+
+    <div class="s-label" style="margin-top:20px">Software</div>
+    <div class="glass-card" style="margin-bottom:12px">
+      <div class="glass-row">
+        <span class="row-label">Version</span>
+        <span class="row-value" style="font-size:13px">${vs?.car_version || '—'}</span>
+      </div>
+      <div class="glass-row">
+        <span class="row-label">Update</span>
+        <span class="row-value ${vs?.software_update?.status === 'available' ? 'amber' : 'green'}">${vs?.software_update?.status === 'available' ? 'Available' : 'Current'}</span>
+      </div>
+    </div>
+    ${vs?.software_update?.status === 'available' ? `<button class="btn btn-secondary" onclick="cmd('schedule_software_update',{offset_sec:3600})">Schedule OTA Update (1h)</button>` : ''}
+
+    <div class="s-label" style="margin-top:20px">Actions</div>
+    <div class="ctrl-row">
+      <div class="ctrl-btn amber" onclick="cmd('reboot_media_unit')"><div class="ci">🔄</div>Reboot MCU</div>
+    </div>
+  `;
+}
+
+function telCell(lbl, val, note, color, pct) {
+  return `<div class="tel-cell">
+    <div class="tel-label">${lbl}</div>
+    <div class="tel-value" style="color:${color}">${val}</div>
+    <div class="tel-note">${note}</div>
+    <div class="tel-bar"><div class="tel-bar-fill" style="width:${Math.max(0,Math.min(100,pct||0))}%;background:${color}"></div></div>
+  </div>`;
+}
+
+// ═════════════════════════════════════════════════════════════════════════════
+// SENTRY SHEET
+// ═════════════════════════════════════════════════════════════════════════════
+function renderSentrySheet() {
+  const vs = vData?.vehicle_state;
+  const active = vs?.sentry_mode;
+  const fst = geofence.status;
+
+  document.getElementById('body-sentry').innerHTML = `
+    <div class="sentry-indicator">
+      <div class="sentry-glow ${active ? 'active' : ''}"></div>
+      <div class="sentry-text">
+        <div class="sentry-state">${active ? 'Sentry Active' : 'Sentry Off'}</div>
+        <div class="sentry-sub">${active ? 'All cameras monitoring' : 'Parked unsupervised'}</div>
+      </div>
+    </div>
+    <div class="ctrl-row" style="margin-bottom:20px">
+      <div class="ctrl-btn red" onclick="cmd('set_sentry_mode',{on:true})"><div class="ci">👁</div>Enable</div>
+      <div class="ctrl-btn amber" onclick="cmd('set_sentry_mode',{on:false})"><div class="ci">⏹</div>Disable</div>
+    </div>
+
+    <div class="glass-card" style="margin-bottom:20px">
+      <div class="glass-row">
+        <span class="row-label">Dashcam</span>
+        <button onclick="cmd('trigger_dashcam')" style="background:rgba(10,132,255,0.15);border:1px solid rgba(10,132,255,.2);border-radius:9999px;color:var(--blue);font-family:var(--font);font-size:13px;font-weight:600;padding:6px 16px;cursor:pointer">Save Clip</button>
+      </div>
+      <div class="glass-row">
+        <span class="row-label">Live View</span>
+        <a href="https://apps.apple.com/app/tesla/id582007913" target="_blank" style="color:var(--blue);font-size:14px;font-weight:500;text-decoration:none">Tesla App ›</a>
+      </div>
+    </div>
+
+    <div class="s-label">Geo-fence Anti-theft</div>
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
+      <div>
+        <div style="font-size:17px;font-weight:600;color:var(--g1)">${geofence.name || 'Home'}</div>
+        <div style="font-size:13px;color:var(--g3);margin-top:2px">${geofence.radiusKm} km radius</div>
+      </div>
+      <span class="fence-pill ${fst === 'INSIDE' ? 'inside' : fst === 'OUTSIDE' ? 'outside' : 'unknown'}">
+        ${fst === 'INSIDE' ? '● Inside' : fst === 'OUTSIDE' ? '● Outside ⚠' : '● Unknown'}
+      </span>
+    </div>
+
+    <div class="map-container" style="margin-bottom:12px"><div id="fence-map"></div></div>
+
+    <div class="glass-card" style="padding:16px 18px;margin-bottom:12px">
+      <div style="font-size:14px;color:var(--g2);margin-bottom:10px">Fence Center</div>
+      <div style="font-size:13px;color:var(--g3);margin-bottom:12px">Tap the map to set your fence center. The car will alert if it leaves this area.</div>
+      <div style="display:flex;gap:10px;align-items:center;margin-bottom:12px">
+        <input type="text" id="fence-name" value="${geofence.name}" placeholder="Name (e.g. Home)" style="flex:1">
+        <button onclick="saveFenceName()" style="background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.1);border-radius:10px;color:var(--g2);font-family:var(--font);font-size:14px;font-weight:600;padding:12px 18px;cursor:pointer">Save</button>
+      </div>
+      <div class="slider-group">
+        <div class="slider-header">
+          <div class="slider-title">Radius</div>
+          <div class="slider-val" id="fr-val">${geofence.radiusKm} km</div>
+        </div>
+        <input type="range" min="0.1" max="5" step="0.1" value="${geofence.radiusKm}" id="fr-slider" oninput="updateFenceRadius(this.value)">
+      </div>
+    </div>
+
+    <div class="ctrl-row">
+      <div class="ctrl-btn red" onclick="setFenceActive(true)"><div class="ci">🔴</div>Arm Fence</div>
+      <div class="ctrl-btn" onclick="setFenceActive(false)"><div class="ci">⏹</div>Disarm</div>
+    </div>
+
+    ${geofence.history?.length ? `
+      <div class="s-label" style="margin-top:20px">Breach History</div>
+      ${geofence.history.slice(0,5).map(e=>`
+        <div class="alert-item">
+          <div class="alert-name" style="color:${e.event==='EXIT'?'var(--red)':'var(--green)'}">
+            ${e.event === 'EXIT' ? '↑ Left fence' : '↓ Returned'} · ${e.distKm} km
+          </div>
+          <div class="alert-time">${new Date(e.at).toLocaleString()}</div>
+        </div>`).join('')}
+    ` : ''}
+
+    ${tel.alerts?.length ? `
+      <div class="s-label" style="margin-top:20px">Vehicle Alerts (${tel.alerts.length})</div>
+      ${tel.alerts.slice().reverse().slice(0,8).map(a=>`
+        <div class="alert-item">
+          <div class="alert-name">${a.name}</div>
+          <div class="alert-time">${a.receivedAt ? new Date(a.receivedAt).toLocaleString() : ''}</div>
+        </div>`).join('')}
+    ` : ''}
+  `;
+  requestAnimationFrame(initFenceMap);
+}
+
+function initFenceMap() {
+  const el = document.getElementById('fence-map');
+  if (!el || fenceMap) return;
+  const lat = geofence.center?.lat || 55.676, lon = geofence.center?.lon || 12.568;
+  fenceMap = L.map('fence-map', { zoomControl: true, attributionControl: false }).setView([lat, lon], 14);
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(fenceMap);
+  if (geofence.center) {
+    L.circle([lat, lon], { radius: geofence.radiusKm * 1000, color: '#E31937', fillColor: '#E31937', fillOpacity: 0.1, weight: 2 }).addTo(fenceMap);
+    L.marker([lat, lon], { icon: L.divIcon({ html: '<div style="width:12px;height:12px;border-radius:50%;background:#E31937;border:2px solid #fff"></div>', iconSize: [12,12], iconAnchor: [6,6] }) }).addTo(fenceMap);
+  }
+  fenceMap.on('click', e => setFenceCenter(e.latlng.lat, e.latlng.lng));
+}
+
+function setFenceCenter(lat, lon) {
+  fetch('/api/geofence', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ center: { lat, lon } }) })
+    .then(r => r.json()).then(d => { Object.assign(geofence, d); if (fenceMap) { fenceMap.eachLayer(l => { if (l instanceof L.Circle || l instanceof L.Marker) fenceMap.removeLayer(l); }); L.circle([lat, lon], { radius: d.radiusKm*1000, color:'#E31937', fillColor:'#E31937', fillOpacity:0.1, weight:2 }).addTo(fenceMap); L.marker([lat, lon], { icon: L.divIcon({ html: '<div style="width:12px;height:12px;border-radius:50%;background:#E31937;border:2px solid #fff"></div>', iconSize:[12,12], iconAnchor:[6,6] }) }).addTo(fenceMap); } toast('Fence center set', 'ok'); });
+}
+function updateFenceRadius(v) { document.getElementById('fr-val').textContent = v + ' km'; fetch('/api/geofence', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ radiusKm: parseFloat(v) }) }).then(r => r.json()).then(d => Object.assign(geofence, d)); }
+function setFenceActive(active) { if (active && !geofence.center) { toast('Tap map to set fence center', 'err'); return; } fetch('/api/geofence', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ active }) }).then(r => r.json()).then(d => { Object.assign(geofence, d); renderSentrySheet(); toast(active ? '🔴 Fence armed' : 'Fence disarmed', active ? 'ok' : 'info'); }); }
+function saveFenceName() { const n = document.getElementById('fence-name')?.value || 'Home'; fetch('/api/geofence', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: n }) }).then(r => r.json()).then(d => { Object.assign(geofence, d); toast('Saved', 'ok'); }); }
+function showGeofenceAlert(n) { if (!n) return; toast((n.urgent ? '🚨 ' : '') + (n.title || 'Alert'), n.urgent ? 'err' : 'info'); }
+
+// ═════════════════════════════════════════════════════════════════════════════
+// MONEY SHEET
+// ═════════════════════════════════════════════════════════════════════════════
+const moneyQs = [
+  { q: 'Annual km driven?', sub: 'Your estimated total per year', opts: [{ v: '8000', icon: '🏙', l: 'Under 10k', s: 'City trips' }, { v: '18000', icon: '🚗', l: '10–25k', s: 'Commuter' }, { v: '32000', icon: '🛣', l: '25–40k', s: 'Regular' }, { v: '50000', icon: '✈', l: 'Over 40k', s: 'High mileage' }] },
+  { q: 'Primary use?', sub: 'What is the car mainly for?', opts: [{ v: 'commute', icon: '💼', l: 'Commute', s: 'Daily work' }, { v: 'family', icon: '👨‍👩‍👧', l: 'Family', s: 'School, shopping' }, { v: 'frequent_trips', icon: '🗺', l: 'Long trips', s: 'Highway heavy' }, { v: 'mixed', icon: '🔄', l: 'Mixed', s: 'All of the above' }] },
+  { q: 'Home charging?', sub: 'Do you charge at home?', opts: [{ v: 'charger', icon: '⚡', l: 'Wallbox', s: '11kW charger' }, { v: 'outlet', icon: '🔌', l: 'Outlet', s: '2.3kW slow' }, { v: 'none_apt', icon: '🏢', l: 'Apartment', s: 'No access' }, { v: 'none', icon: '❌', l: 'None', s: 'Public only' }] },
+  { q: 'Work charging?', sub: 'Available at your workplace?', opts: [{ v: 'free', icon: '🎁', l: 'Free', s: 'Paid by work' }, { v: 'paid', icon: '💳', l: 'Paid', s: 'I pay' }, { v: 'none', icon: '❌', l: 'None', s: 'Not available' }] },
+  { q: 'Typical trip?', sub: 'Most common driving pattern', opts: [{ v: 'urban', icon: '🏙', l: 'Urban', s: 'Under 30 km' }, { v: 'mixed', icon: '🔄', l: 'Mixed', s: '30–100 km' }, { v: 'highway', icon: '🛣', l: 'Highway', s: '100km+' }] },
+];
+
+function renderMoneyWizard() {
+  moneyStep = 0; moneyAnswers = {};
+  renderMoneyStep();
+}
+
+function renderMoneyStep() {
+  if (moneyStep >= moneyQs.length) { runMoneyAnalysis(); return; }
+  const q = moneyQs[moneyStep];
+  document.getElementById('body-money').innerHTML = `
+    <div class="money-q">
+      <div class="money-q-num">Question ${moneyStep + 1} of ${moneyQs.length}</div>
+      <div class="money-q-title">${q.q}</div>
+      <div class="money-q-sub">${q.sub}</div>
+      <div class="money-opts">${q.opts.map(o => `
+        <div class="money-opt" onclick="pickMoney('${o.v}')">
+          <div class="mo-icon">${o.icon}</div>
+          <div class="mo-lbl">${o.l}</div>
+          <div class="mo-sub">${o.s}</div>
+        </div>`).join('')}
+      </div>
+    </div>
+    ${moneyStep > 0 ? `<button class="btn btn-glass btn-sm" onclick="moneyStep--;renderMoneyStep()" style="color:var(--g3)">← Back</button>` : ''}
+  `;
+}
+
+function pickMoney(v) {
+  const keys = ['annualKm', 'useType', 'homeCharging', 'workCharging', 'primaryTrip'];
+  moneyAnswers[keys[moneyStep]] = v;
+  moneyStep++;
+  if (moneyStep < moneyQs.length) renderMoneyStep();
+  else runMoneyAnalysis();
+}
+
+async function runMoneyAnalysis() {
+  document.getElementById('body-money').innerHTML = '<div class="empty-state"><div class="spinner" style="width:36px;height:36px;border:2px solid rgba(255,255,255,.1);border-top-color:var(--red);border-radius:50%;animation:spin .8s linear infinite"></div><div>Calculating...</div></div><style>@keyframes spin{to{transform:rotate(360deg)}}</style>';
+  try {
+    const r = await fetch('/api/money/analyze', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(moneyAnswers) });
+    const d = await r.json();
+    renderMoneyResult(d);
+  } catch (e) { document.getElementById('body-money').innerHTML = `<div class="info-box warn-box">Analysis failed: ${e.message}</div>`; }
+}
+
+function renderMoneyResult(d) {
+  const sorted = Object.entries(d.scenarios).sort((a, b) => a[1].annualDKK - b[1].annualDKK);
+  const best = d.bestScenario;
+  const providers = [
+    { icon: '🇩🇰', name: 'CLEVER', price: '799 DKK/mo unlimited · Best above ' + d.cleverBreakEvenKmMonth + ' km/mo public', url: 'https://clever.dk' },
+    { icon: '⚡', name: 'Spirii', price: '3.13 DKK/kWh AC · 5.19 DKK/kWh DC', url: 'https://spirii.com' },
+    { icon: '🔌', name: 'E.ON Drive', price: 'From 3.75 DKK/kWh · EU roaming', url: 'https://eon.dk' },
+    { icon: '🏎', name: 'Tesla Supercharger', price: '~4.50 DKK/kWh · Fastest DC', url: 'https://tesla.com/supercharger' },
+    { icon: '🌱', name: 'Norlys / OK', price: '~3–4 DKK/kWh · Strong in Jutland', url: 'https://norlys.dk' },
+  ];
+
+  document.getElementById('body-money').innerHTML = `
+    <div style="padding:4px 0 20px">
+      <div style="font-size:13px;font-weight:600;letter-spacing:0.06em;text-transform:uppercase;color:var(--g3);margin-bottom:8px">Annual saving potential</div>
+      ${d.savings > 1000 ? `<div style="font-size:48px;font-weight:200;letter-spacing:-0.04em;color:var(--green);line-height:1">${Math.round(d.savings).toLocaleString()} <span style="font-size:22px;font-weight:300">DKK</span></div>` : `<div style="font-size:32px;font-weight:300;color:var(--g2)">Well optimized</div>`}
+      <div style="font-size:14px;color:var(--g3);margin-top:6px">${d.tip}</div>
+    </div>
+
+    <div class="s-label">Scenarios</div>
+    ${sorted.map(([k, s]) => `
+      <div class="result-item ${k === best ? 'best' : ''}">
+        <div class="result-name">${k === best ? '⭐ ' : ''}${s.label}</div>
+        <div class="result-price">${s.annualDKK.toLocaleString()} DKK/yr</div>
+        <div class="result-note">${s.perKm} DKK/km · ${s.notes}</div>
+      </div>`).join('')}
+
+    <div class="info-box" style="margin-top:4px">Sunday noon charging in Denmark costs 65% less than weekday evening peak. Target 01:00–06:00 on weekdays with a scheduled charge.</div>
+
+    <div class="s-label" style="margin-top:20px">Danish Providers</div>
+    <div class="glass-card">
+      ${providers.map(p => `
+        <a class="provider-row" href="${p.url}" target="_blank">
+          <div class="prov-icon-wrap">${p.icon}</div>
+          <div class="prov-body">
+            <div class="prov-name">${p.name}</div>
+            <div class="prov-price">${p.price}</div>
+          </div>
+          <div class="prov-chevron">›</div>
+        </a>`).join('')}
+    </div>
+    <button class="btn btn-glass btn-sm" style="margin-top:16px;color:var(--g3)" onclick="moneyStep=0;moneyAnswers={};renderMoneyStep()">← Start Over</button>
+  `;
+}
+
+// ═════════════════════════════════════════════════════════════════════════════
+// COMMANDS
+// ═════════════════════════════════════════════════════════════════════════════
+async function cmd(command, params = {}) {
+  toast(command.replace(/_/g, ' '), 'info');
+  try {
+    const r = await fetch(`/api/vehicles/${selId}/command/${command}`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(params)
+    });
+    const d = await r.json();
+    if (d.error) throw new Error(d.error);
+    if (d.response?.result === false) throw new Error(d.response.reason || 'Command rejected');
+    toast('Done', 'ok');
+    setTimeout(refresh, 1800);
+  } catch (e) { toast(e.message, 'err'); }
+}
+
+// ═════════════════════════════════════════════════════════════════════════════
+// FAULTS
+// ═════════════════════════════════════════════════════════════════════════════
+function faults() {
+  const cs = vData?.charge_state, vs = vData?.vehicle_state, f = [];
+  const add = (sev, code, title, desc) => f.push({ sev, code, title, desc });
+  if (cs?.battery_level < 15) add('critical', 'BMS_LOW_SOC', 'Critical Battery', 'Under 15% — charge immediately.');
+  if (cs?.battery_level && cs?.usable_battery_level && cs.battery_level - cs.usable_battery_level > 3) add('warn', 'BMS_u001', 'Cell Buffer Loss', 'Usable SOC vs total gap >3% — cell variance.');
+  if (cs?.battery_range && cs?.ideal_battery_range && cs.ideal_battery_range > 0 && cs.battery_range / cs.ideal_battery_range < 0.72) add('warn', 'BMS_u029', 'Pack Degradation >28%', 'Rated range well below ideal.');
+  if (cs?.charging_state === 'Fault' || cs?.charging_state === 'NoPower') add('critical', 'UMC_a063', 'Charging Fault', 'Check port and cable.');
+  if ([vs?.tpms_soft_warning_fl, vs?.tpms_soft_warning_fr, vs?.tpms_soft_warning_rl, vs?.tpms_soft_warning_rr].some(Boolean)) add('warn', 'TPMS_LOW', 'Tyre Pressure Low', 'Inflate to 2.9 bar (42 PSI).');
+  if (vs?.df || vs?.dr || vs?.pf || vs?.pr) add('critical', 'DOOR_AJAR', 'Door Not Closed', 'Do not drive until resolved.');
+  if (vs?.ft) add('critical', 'FRUNK_OPEN', 'Frunk Unlatched', 'Front trunk is open.');
+  if (vs?.software_update?.status === 'available') add('info', 'SW_UPDATE', 'Update Available', `Firmware ${vs.software_update.version || ''} ready.`);
+  add('warn', 'MCU_AUDIO_a001', 'Audio System Fault', 'Horn/chimes unavailable. Reboot MCU recommended.');
+  const t = tel.signals || {};
+  if (t.IsolationResistance != null && t.IsolationResistance < 100) add('critical', 'HVIL_ISO', 'Isolation Resistance Low', t.IsolationResistance + ' kΩ — service required.');
+  if (t.Hvil === false) add('critical', 'HVIL_OPEN', 'HVIL Loop Open', 'High Voltage Interlock interrupted.');
+  return f;
+}
+
+// ═════════════════════════════════════════════════════════════════════════════
+// ONBOARDING
+// ═════════════════════════════════════════════════════════════════════════════
+let obStep = 0;
+function showOnboard() {
+  document.getElementById('onboard').style.display = 'flex';
+  document.getElementById('app').style.display = 'none';
+  renderObProgress();
+}
+function renderObProgress() {
+  document.getElementById('ob-prog').innerHTML = [0,1,2,3].map(i =>
+    `<div class="ob-dot ${i === obStep ? 'active' : ''}"></div>`).join('');
+}
+function obGo(n) {
+  const cur = document.getElementById(`ob-${obStep}`);
+  cur.classList.remove('active');
+  obStep = n;
+  const next = document.getElementById(`ob-${obStep}`);
+  next.classList.add('active');
+  renderObProgress();
+}
+async function obConnect() {
+  const t = document.getElementById('ob-token').value.trim();
+  const err = document.getElementById('ob-err');
+  err.style.display = 'none';
+  if (!t) { err.style.display = 'block'; err.textContent = 'Paste your token above.'; return; }
+  const btn = document.getElementById('ob-connect-btn');
+  btn.textContent = 'Connecting…'; btn.disabled = true;
+  try {
+    const cr = await fetch('/api/configure', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ refreshToken: t }) });
+    const cd = await cr.json();
+    if (!cd.ok) throw new Error(cd.error || 'Connection failed');
+    localStorage.setItem('tt', t);
+    const vr = await fetch('/api/vehicles'); const vd = await vr.json();
+    const v = vd.response?.[0];
+    if (v) {
+      document.getElementById('ob-vehicle-name').textContent = (v.display_name || 'Tesla') + '.';
+      document.getElementById('ob-car-model').textContent = v.vin || '';
+    }
+    obGo(3);
+  } catch (e) {
+    localStorage.removeItem('tt');
+    err.style.display = 'block';
+    err.textContent = e.message;
+    btn.textContent = 'Connect vehicle ›'; btn.disabled = false;
+  }
+}
+function obFinish() {
+  document.getElementById('onboard').style.display = 'none';
+  launchApp();
+}
+
+// ═════════════════════════════════════════════════════════════════════════════
+// UTILS
+// ═════════════════════════════════════════════════════════════════════════════
+function renderAsleep(v) {
+  updateLive(v?.state || 'asleep');
+  const html = `
+    <div class="asleep-state">
+      <div class="asleep-icon">😴</div>
+      <div class="asleep-label">${(v?.state || 'Asleep').charAt(0).toUpperCase() + (v?.state || 'asleep').slice(1)}</div>
+      <div class="asleep-sub">${v?.display_name || 'Your Tesla'}</div>
+      <button class="btn btn-primary" style="max-width:200px;margin-top:8px" onclick="wakeVehicle()">Wake Up</button>
+    </div>
+  `;
+  if (isDesktop()) {
+    document.getElementById('sidebar-inner').innerHTML = html;
+    document.getElementById('panel-inner').innerHTML = '';
+  } else {
+    setStage(html);
+  }
+}
+
+async function wakeVehicle() {
+  setStage(`<div class="asleep-state"><div class="asleep-icon" style="animation:pulse 1s infinite">⚡</div><div class="asleep-label">Waking up…</div><div class="asleep-sub">Up to 30 seconds</div></div><style>@keyframes pulse{50%{opacity:0.3}}</style>`);
+  try { await fetch(`/api/vehicles/${selId}/wake`, { method: 'POST' }); await refresh(); }
+  catch (e) { toast(e.message, 'err'); }
+}
+
+function updateLive(state) {
+  const dot = document.getElementById('live-dot');
+  const lbl = document.getElementById('header-state');
+  dot.className = 'live-dot ' + (state === 'online' ? (vData?.charge_state?.charging_state === 'Charging' ? 'charging' : 'online') : state === 'asleep' ? 'asleep' : '');
+  lbl.textContent = state.toUpperCase();
+}
+
+function setStage(html) { document.getElementById('stage-inner').innerHTML = html; }
+
+let toastTimer;
+function toast(msg, type = '') {
+  const el = document.getElementById('toast');
+  el.textContent = msg; el.className = `${type ? type : ''}`;
+  el.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => el.classList.remove('show'), 2800);
+}
+
+async function fetchJ(url) { const r = await fetch(url); return r.json(); }
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+
+// Boot
+boot();
+</script>
+</body>
+</html>

@@ -1,0 +1,40 @@
+# render.yaml — deploy to Render.com in one click
+# Docs: https://render.com/docs/yaml-spec
+
+services:
+  # ── Tesla Dashboard (Node.js) ────────────────────────────────────────────────
+  - type: web
+    name: tesla-dashboard
+    env: node
+    plan: free
+    buildCommand: npm install
+    startCommand: node server.js
+    envVars:
+      - key: TESLA_REFRESH_TOKEN
+        sync: false          # You fill this in via Render dashboard
+      - key: TESLA_CLIENT_ID
+        sync: false
+      - key: TESLA_API_REGION
+        value: eu            # Change to "na" if in North America
+      - key: TESLA_PROXY_URL
+        # Leave blank until proxy service is deployed, then set to:
+        # https://tesla-proxy.onrender.com/api/1
+        sync: false
+      - key: TESLA_PUBLIC_KEY
+        # Paste your public key PEM content here (single line, escaped)
+        sync: false
+
+  # ── Tesla Vehicle Command Proxy (Docker) ─────────────────────────────────────
+  # This unlocks: Summon, Autopark, Lock/Unlock, Climate, all post-2021 commands
+  - type: web
+    name: tesla-proxy
+    env: docker
+    plan: free
+    dockerfilePath: ./Dockerfile.proxy
+    envVars:
+      - key: TESLA_TOKEN_NAME
+        value: tesla
+      - key: TESLA_KEY_NAME
+        value: tesla
+      - key: TESLA_CACHE_FILE
+        value: /tmp/.tesla-cache.json
