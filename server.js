@@ -503,16 +503,34 @@ app.get("/api/menubar", async (req, res) => {
   try {
     // Returns SwiftBar-formatted text
     const baseUrl = process.env.PUBLIC_URL || `http://localhost:${PORT}`;
+    const vehicle = cachedVehicles[0];
+    const vid = vehicle?.id || 'unknown';
+    const isAsleep = vehicle?.state !== 'online';
     const d = lastVehicleData;
     const cs = d?.charge_state, vs = d?.vehicle_state;
+
+    // Asleep state — show Zzz
+    if (isAsleep) {
+      const menu = [
+        `T 😴 Zzz`, "---",
+        `Status: ${vehicle?.state || 'asleep'} | color=#FF9F0A`,
+        `${vehicle?.display_name || 'Tesla'} | color=#A0A0B0`,
+        "---",
+        `Wake Up | bash=/usr/bin/curl param1=-s param2=-X param3=POST param4=${baseUrl}/api/vehicles/${vid}/wake terminal=false refresh=true`,
+        "---",
+        `Open Dashboard | href=${baseUrl}`,
+      ].join("\n");
+      return res.type("text/plain").send(menu);
+    }
+
+    // Online state — show full info
     const pct   = cs?.battery_level ?? "?";
     const locked = vs?.locked ? "🔒" : "🔓";
-    const state  = cs?.charging_state === "Charging" ? " ⚡" : "";
+    const charging = cs?.charging_state === "Charging" ? " ⚡" : "";
     const warn   = (cs?.battery_level < 20 || [vs?.tpms_soft_warning_fl, vs?.tpms_soft_warning_fr, vs?.tpms_soft_warning_rl, vs?.tpms_soft_warning_rr].some(Boolean)) ? " ⚠" : "";
     const geo    = geofence.active ? (geofence.status === "OUTSIDE" ? " 🚨" : "") : "";
-    const line1  = `T ${pct}%${state}${locked}${warn}${geo}`;
-    const vid = cachedVehicles[0]?.id || 'unknown';
-    // SwiftBar submenu
+    const line1  = `T ${pct}%${charging}${locked}${warn}${geo}`;
+
     const menu = [
       line1, "---",
       `Battery: ${pct}% | color=#FFFFFF`,
@@ -523,6 +541,7 @@ app.get("/api/menubar", async (req, res) => {
       "---",
       `Open Dashboard | href=${baseUrl}`,
       "---",
+      `Wake Up | bash=/usr/bin/curl param1=-s param2=-X param3=POST param4=${baseUrl}/api/vehicles/${vid}/wake terminal=false refresh=true`,
       `Lock | bash=/usr/bin/curl param1=-s param2=-X param3=POST param4=${baseUrl}/api/vehicles/${vid}/command/door_lock terminal=false refresh=true`,
       `Unlock | bash=/usr/bin/curl param1=-s param2=-X param3=POST param4=${baseUrl}/api/vehicles/${vid}/command/door_unlock terminal=false refresh=true`,
       `Flash Lights | bash=/usr/bin/curl param1=-s param2=-X param3=POST param4=${baseUrl}/api/vehicles/${vid}/command/flash_lights terminal=false`,
