@@ -864,28 +864,29 @@ input::placeholder { color: var(--g3); }
     <button class="btn btn-primary" onclick="obGo(1)">Begin &nbsp;›</button>
   </div>
 
-  <!-- Step 1: Get token -->
+  <!-- Step 1: Connect via OAuth -->
   <div class="ob-step" id="ob-1">
     <div class="ob-icon">🔑</div>
-    <div class="ob-title">One key.</div>
+    <div class="ob-title">Sign in.</div>
     <div class="ob-sub">
-      Get your Tesla refresh token at<br>
-      <a class="ob-link" href="https://tesla-auth.netlify.app" target="_blank">tesla-auth.netlify.app →</a>
-      <br><br>Log in with your Tesla account.<br>Copy the refresh_token shown.
+      Connect directly with your Tesla account.<br>
+      Secure OAuth — no tokens to copy.
     </div>
-    <button class="btn btn-primary" onclick="obGo(2)">I have my token &nbsp;›</button>
+    <a href="/auth/tesla" class="btn btn-primary" style="display:inline-block;text-decoration:none">Sign in with Tesla &nbsp;›</a>
     <div style="height:12px"></div>
-    <button class="btn btn-glass" onclick="obGo(2)">Skip for now</button>
+    <button class="btn btn-glass" onclick="obGo(2)">Use token instead</button>
   </div>
 
-  <!-- Step 2: Connect -->
+  <!-- Step 2: Manual token (fallback) -->
   <div class="ob-step" id="ob-2">
     <div class="ob-icon">🚗</div>
     <div class="ob-title">Connect.</div>
-    <div class="ob-sub" style="margin-bottom:28px">Paste your token below.<br>Stored securely on this device only.</div>
+    <div class="ob-sub" style="margin-bottom:28px">Paste your refresh token below.<br>Stored securely on this device only.</div>
     <input class="ob-input" id="ob-token" type="password" placeholder="eyJ... (refresh token)" autocomplete="off">
     <div class="ob-err" id="ob-err"></div>
     <button class="btn btn-primary" id="ob-connect-btn" onclick="obConnect()">Connect vehicle &nbsp;›</button>
+    <div style="height:12px"></div>
+    <button class="btn btn-glass" onclick="obGo(1)">‹ Back to OAuth</button>
   </div>
 
   <!-- Step 3: Success -->
