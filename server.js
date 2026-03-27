@@ -104,6 +104,39 @@ async function tesla(method, path, body, retry = false) {
 }
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 
+// Partner registration (required once per region)
+let partnerRegistered = false;
+async function ensurePartnerRegistered() {
+  if (partnerRegistered) return;
+  if (!clientId || !clientSecret) throw new Error("Client ID and Secret required for partner registration");
+
+  // Get client_credentials token (app-only)
+  const params = new URLSearchParams({
+    grant_type: "client_credentials",
+    client_id: clientId,
+    client_secret: clientSecret,
+    scope: "openid vehicle_device_data vehicle_cmds vehicle_charging_cmds"
+  });
+  const authRes = await axios.post(AUTH_URL, params.toString(), {
+    headers: { "Content-Type": "application/x-www-form-urlencoded" }
+  });
+  const appToken = authRes.data.access_token;
+
+  // Register with Fleet API region
+  try {
+    await axios.post(`${API_BASE}/partner_accounts`, { domain: process.env.RAILWAY_PUBLIC_DOMAIN || "commandcenter.agency" }, {
+      headers: { Authorization: `Bearer ${appToken}`, "Content-Type": "application/json" }
+    });
+    console.log("✓ Partner registered with Fleet API region");
+  } catch (e) {
+    // 409 = already registered, that's fine
+    if (e.response?.status !== 409) {
+      console.warn("Partner registration warning:", e.response?.data || e.message);
+    }
+  }
+  partnerRegistered = true;
+}
+
 // ── Fleet Telemetry WS ────────────────────────────────────────────────────────
 wss.on("connection", ws => {
   telemetry.connected = true;
@@ -296,8 +329,12 @@ app.post("/api/logout", (req, res) => {
 });
 
 app.get("/api/vehicles", async (req, res) => {
-  try { const d = await tesla("get", "/vehicles"); cachedVehicles = d.response || []; res.json(d); }
-  catch (e) { res.status(500).json({ error: e.message }); }
+  try {
+    await ensurePartnerRegistered();
+    const d = await tesla("get", "/vehicles");
+    cachedVehicles = d.response || [];
+    res.json(d);
+  } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
 app.get("/api/vehicles/:id/data", async (req, res) => {
