@@ -221,7 +221,7 @@ app.get("/auth/tesla", (req, res) => {
   const protocol = req.secure || req.get("x-forwarded-proto") === "https" ? "https" : "http";
   const redirectUri = `${protocol}://${host}/callback`;
   const state = Math.random().toString(36).slice(2);
-  const scope = "openid offline_access user_data vehicle_device_data vehicle_cmds vehicle_charging_cmds";
+  const scope = "openid offline_access user_data vehicle_device_data vehicle_location vehicle_cmds vehicle_charging_cmds";
   const url = `${AUTHORIZE_URL}?client_id=${clientId}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&scope=${encodeURIComponent(scope)}&state=${state}`;
   res.redirect(url);
 });
