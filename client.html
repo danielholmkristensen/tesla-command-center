@@ -854,43 +854,28 @@ input::placeholder { color: var(--g3); }
 
 <!-- ── Onboarding ─────────────────────────────────────────────────────────── -->
 <div id="onboard" style="display:none">
-  <div class="ob-progress" id="ob-prog"></div>
+  <div class="ob-progress" id="ob-prog" style="display:none"></div>
 
-  <!-- Step 0: Welcome -->
+  <!-- Login -->
   <div class="ob-step active" id="ob-0">
-    <div class="ob-icon">⚡</div>
-    <div class="ob-title">Tesla.</div>
-    <div class="ob-sub">Your car, perfectly controlled.<br>From your pocket.</div>
-    <button class="btn btn-primary" onclick="obGo(1)">Begin &nbsp;›</button>
+    <div class="ob-icon">🚗</div>
+    <div class="ob-title">Command Center</div>
+    <div class="ob-sub" id="ob-login-sub">Checking connection...</div>
+    <a href="/auth/tesla" class="btn btn-primary" id="ob-login-btn" style="display:none;text-decoration:none">Log in with Tesla &nbsp;›</a>
   </div>
 
-  <!-- Step 1: Connect via OAuth -->
+  <!-- Manual token (accessed via ?token=1) -->
   <div class="ob-step" id="ob-1">
     <div class="ob-icon">🔑</div>
-    <div class="ob-title">Sign in.</div>
-    <div class="ob-sub">
-      Connect directly with your Tesla account.<br>
-      Secure OAuth — no tokens to copy.
-    </div>
-    <a href="/auth/tesla" class="btn btn-primary" style="display:inline-block;text-decoration:none">Sign in with Tesla &nbsp;›</a>
-    <div style="height:12px"></div>
-    <button class="btn btn-glass" onclick="obGo(2)">Use token instead</button>
-  </div>
-
-  <!-- Step 2: Manual token (fallback) -->
-  <div class="ob-step" id="ob-2">
-    <div class="ob-icon">🚗</div>
-    <div class="ob-title">Connect.</div>
-    <div class="ob-sub" style="margin-bottom:28px">Paste your refresh token below.<br>Stored securely on this device only.</div>
-    <input class="ob-input" id="ob-token" type="password" placeholder="eyJ... (refresh token)" autocomplete="off">
+    <div class="ob-title">Manual Connect</div>
+    <div class="ob-sub" style="margin-bottom:28px">Paste your refresh token.</div>
+    <input class="ob-input" id="ob-token" type="password" placeholder="Refresh token" autocomplete="off">
     <div class="ob-err" id="ob-err"></div>
-    <button class="btn btn-primary" id="ob-connect-btn" onclick="obConnect()">Connect vehicle &nbsp;›</button>
-    <div style="height:12px"></div>
-    <button class="btn btn-glass" onclick="obGo(1)">‹ Back to OAuth</button>
+    <button class="btn btn-primary" id="ob-connect-btn" onclick="obConnect()">Connect &nbsp;›</button>
   </div>
 
-  <!-- Step 3: Success -->
-  <div class="ob-step" id="ob-3">
+  <!-- Success -->
+  <div class="ob-step" id="ob-2">
     <div class="check-circle">
       <svg viewBox="0 0 40 40" fill="none">
         <path class="check-path" d="M8 20 L17 29 L32 12" stroke="white" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"/>
@@ -899,10 +884,9 @@ input::placeholder { color: var(--g3); }
     <div class="ob-title" id="ob-vehicle-name">Connected.</div>
     <div class="ob-vehicle-name" id="ob-car-model"></div>
     <div class="ob-sub" style="margin-bottom:40px">
-      For the best experience, add to your<br>home screen:
-      <br><br>Safari → Share → <strong style="color:var(--g2)">Add to Home Screen</strong>
+      Add to home screen for the best experience.
     </div>
-    <button class="btn btn-primary" onclick="obFinish()">Open Dashboard &nbsp;›</button>
+    <button class="btn btn-primary" onclick="obFinish()">Continue &nbsp;›</button>
   </div>
 </div>
 
@@ -2049,19 +2033,24 @@ let obStep = 0;
 function showOnboard() {
   document.getElementById('onboard').style.display = 'flex';
   document.getElementById('app').style.display = 'none';
-  renderObProgress();
-}
-function renderObProgress() {
-  document.getElementById('ob-prog').innerHTML = [0,1,2,3].map(i =>
-    `<div class="ob-dot ${i === obStep ? 'active' : ''}"></div>`).join('');
+  document.getElementById('ob-prog').style.display = 'none'; // Hide progress dots
+
+  // Check if manual token mode via URL param
+  const params = new URLSearchParams(window.location.search);
+  if (params.get('token') === '1') {
+    obGo(1); // Show token input
+    return;
+  }
+
+  // Show login button
+  document.getElementById('ob-login-sub').textContent = 'Control your Tesla from anywhere.';
+  document.getElementById('ob-login-btn').style.display = 'inline-block';
 }
 function obGo(n) {
-  const cur = document.getElementById(`ob-${obStep}`);
-  cur.classList.remove('active');
+  document.querySelectorAll('.ob-step').forEach(s => s.classList.remove('active'));
+  const next = document.getElementById(`ob-${n}`);
+  if (next) next.classList.add('active');
   obStep = n;
-  const next = document.getElementById(`ob-${obStep}`);
-  next.classList.add('active');
-  renderObProgress();
 }
 async function obConnect() {
   const t = document.getElementById('ob-token').value.trim();
@@ -2081,7 +2070,7 @@ async function obConnect() {
       document.getElementById('ob-vehicle-name').textContent = (v.display_name || 'Tesla') + '.';
       document.getElementById('ob-car-model').textContent = v.vin || '';
     }
-    obGo(3);
+    obGo(2);
   } catch (e) {
     localStorage.removeItem('tt');
     err.style.display = 'block';
