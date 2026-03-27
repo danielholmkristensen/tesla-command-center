@@ -502,6 +502,7 @@ app.post("/api/push/subscribe", (req, res) => {
 app.get("/api/menubar", async (req, res) => {
   try {
     // Returns SwiftBar-formatted text
+    const baseUrl = process.env.PUBLIC_URL || `http://localhost:${PORT}`;
     const d = lastVehicleData;
     const cs = d?.charge_state, vs = d?.vehicle_state;
     const pct   = cs?.battery_level ?? "?";
@@ -510,6 +511,7 @@ app.get("/api/menubar", async (req, res) => {
     const warn   = (cs?.battery_level < 20 || [vs?.tpms_soft_warning_fl, vs?.tpms_soft_warning_fr, vs?.tpms_soft_warning_rl, vs?.tpms_soft_warning_rr].some(Boolean)) ? " ⚠" : "";
     const geo    = geofence.active ? (geofence.status === "OUTSIDE" ? " 🚨" : "") : "";
     const line1  = `T ${pct}%${state}${locked}${warn}${geo}`;
+    const vid = cachedVehicles[0]?.id || 'unknown';
     // SwiftBar submenu
     const menu = [
       line1, "---",
@@ -519,13 +521,13 @@ app.get("/api/menubar", async (req, res) => {
       `Sentry: ${vs?.sentry_mode ? "ON 🔴" : "OFF"} | color=#A0A0B0`,
       `Fence: ${geofence.active ? geofence.status : "OFF"} | color=#A0A0B0`,
       "---",
-      `Open Dashboard | href=http://localhost:${PORT}`,
+      `Open Dashboard | href=${baseUrl}`,
       "---",
-      `Lock | bash=/usr/local/bin/curl param1=-s param2=-X param3=POST param4=http://localhost:${PORT}/api/vehicles/${cachedVehicles[0]?.id}/command/door_lock terminal=false refresh=true`,
-      `Unlock | bash=/usr/local/bin/curl param1=-s param2=-X param3=POST param4=http://localhost:${PORT}/api/vehicles/${cachedVehicles[0]?.id}/command/door_unlock terminal=false refresh=true`,
-      `Flash Lights | bash=/usr/local/bin/curl param1=-s param2=-X param3=POST param4=http://localhost:${PORT}/api/vehicles/${cachedVehicles[0]?.id}/command/flash_lights terminal=false`,
-      `Honk | bash=/usr/local/bin/curl param1=-s param2=-X param3=POST param4=http://localhost:${PORT}/api/vehicles/${cachedVehicles[0]?.id}/command/honk_horn terminal=false`,
-      `Start Climate | bash=/usr/local/bin/curl param1=-s param2=-X param3=POST param4=http://localhost:${PORT}/api/vehicles/${cachedVehicles[0]?.id}/command/auto_conditioning_start terminal=false refresh=true`,
+      `Lock | bash=/usr/bin/curl param1=-s param2=-X param3=POST param4=${baseUrl}/api/vehicles/${vid}/command/door_lock terminal=false refresh=true`,
+      `Unlock | bash=/usr/bin/curl param1=-s param2=-X param3=POST param4=${baseUrl}/api/vehicles/${vid}/command/door_unlock terminal=false refresh=true`,
+      `Flash Lights | bash=/usr/bin/curl param1=-s param2=-X param3=POST param4=${baseUrl}/api/vehicles/${vid}/command/flash_lights terminal=false`,
+      `Honk | bash=/usr/bin/curl param1=-s param2=-X param3=POST param4=${baseUrl}/api/vehicles/${vid}/command/honk_horn terminal=false`,
+      `Start Climate | bash=/usr/bin/curl param1=-s param2=-X param3=POST param4=${baseUrl}/api/vehicles/${vid}/command/auto_conditioning_start terminal=false refresh=true`,
     ].join("\n");
     res.type("text/plain").send(menu);
   } catch (e) { res.type("text/plain").send(`T ⚠ | color=red\n---\nError: ${e.message}`); }
