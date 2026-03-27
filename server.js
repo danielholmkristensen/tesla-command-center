@@ -339,7 +339,8 @@ app.get("/api/vehicles", async (req, res) => {
 
 app.get("/api/vehicles/:id/data", async (req, res) => {
   try {
-    const ep = req.query.endpoints || "charge_state;climate_state;drive_state;vehicle_state;vehicle_config";
+    // Include location_data for firmware 2023.38+
+    const ep = req.query.endpoints || "charge_state;climate_state;drive_state;location_data;vehicle_state;vehicle_config";
     const d = await tesla("get", `/vehicles/${req.params.id}/vehicle_data?endpoints=${encodeURIComponent(ep)}`);
     if (d.response) lastVehicleData = d.response;
     res.json(d);
@@ -348,9 +349,11 @@ app.get("/api/vehicles/:id/data", async (req, res) => {
 
 app.get("/api/vehicles/:id/location", async (req, res) => {
   try {
-    const d = await tesla("get", `/vehicles/${req.params.id}/vehicle_data?endpoints=drive_state`);
+    // Tesla firmware 2023.38+ requires location_data endpoint explicitly
+    const endpoints = encodeURIComponent("drive_state;location_data");
+    const d = await tesla("get", `/vehicles/${req.params.id}/vehicle_data?endpoints=${endpoints}`);
     const ds = d.response?.drive_state;
-    if (!ds?.latitude) return res.status(404).json({ error: "Location not available. Vehicle may not have location_data scope." });
+    if (!ds?.latitude) return res.status(404).json({ error: "Location not available. Grant vehicle_location scope or vehicle may be asleep." });
     if (geofence.center) {
       ds._distFromFence = haversineKm(geofence.center.lat, geofence.center.lon, ds.latitude, ds.longitude);
       ds._fenceName = geofence.name;

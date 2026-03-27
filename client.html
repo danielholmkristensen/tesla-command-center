@@ -25,9 +25,9 @@
   --purple: #BF5AF2;
   --white:  #FFFFFF;
   --g1: rgba(255,255,255,0.95);
-  --g2: rgba(255,255,255,0.72);
-  --g3: rgba(255,255,255,0.55);
-  --g4: rgba(255,255,255,0.18);
+  --g2: rgba(255,255,255,0.78);
+  --g3: rgba(255,255,255,0.65);
+  --g4: rgba(255,255,255,0.22);
   --g5: rgba(255,255,255,0.08);
   --g6: rgba(255,255,255,0.04);
   --sat: env(safe-area-inset-top,    0px);
@@ -1338,6 +1338,19 @@ function openSheet(id) {
   let ty0 = 0;
   handle.addEventListener('touchstart', e => { ty0 = e.touches[0].clientY; }, { passive: true });
   handle.addEventListener('touchend',   e => { if (e.changedTouches[0].clientY - ty0 > 70) closeSheet(); }, { passive: true });
+}
+
+function renderSheet(id) {
+  const renders = {
+    location: renderLocationSheet,
+    climate: renderClimateSheet,
+    charge: renderChargeSheet,
+    health: renderHealthSheet,
+    sentry: renderSentrySheet,
+    money: renderMoneyWizard
+  };
+  const fn = renders[id];
+  if (fn) fn();
 }
 
 function closeSheet() {
